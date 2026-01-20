@@ -2,6 +2,7 @@
 #include "Config.h"
 
 void TempSensor::begin(uint8_t pin) {
+  if (_oneWire) return;  // Already initialized, prevent memory leak
   _oneWire = new OneWire(pin);
   _sensors = new DallasTemperature(_oneWire);
 
