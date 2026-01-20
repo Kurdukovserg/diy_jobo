@@ -13,19 +13,26 @@ public:
   bool backPressed();    // BACK button pressed (stop/menu)
   bool confirmPressed(); // Encoder SW pressed (enter menu/confirm)
 
+  // ISR handler - called from interrupt
+  static void IRAM_ATTR encoderISR();
+
 private:
+  static EncoderInput* _instance;
+  
   uint8_t _encA = 0, _encB = 0, _encSw = 0;
   uint8_t _btnOk = 0, _btnBack = 0;
 
-  int _lastEncA = HIGH;
-  uint32_t _encLastUs = 0;
+  // Encoder state machine (quadrature)
+  volatile int8_t _encState = 0;
+  volatile int _rpmDelta = 0;
 
+  // Button states
   bool _lastOk = true;
   bool _lastBack = true;
   bool _lastConfirm = true;
+  uint32_t _lastBtnMs = 0;
 
-  int _rpmDelta = 0;
-  bool _okFlag = false;
-  bool _backFlag = false;
-  bool _confirmFlag = false;
+  volatile bool _okFlag = false;
+  volatile bool _backFlag = false;
+  volatile bool _confirmFlag = false;
 };
