@@ -2,6 +2,7 @@
 #include "Config.h"
 
 void Display::begin(uint8_t sda, uint8_t scl) {
+  if (_u8g2) return;  // Already initialized, prevent memory leak
   _u8g2 = new U8G2_SSD1306_128X64_NONAME_F_SW_I2C(U8G2_R0, scl, sda, U8X8_PIN_NONE);
   _u8g2->begin();
   _initialized = true;
