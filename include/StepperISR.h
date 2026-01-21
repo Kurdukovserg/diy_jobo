@@ -4,26 +4,34 @@
 class StepperISR {
 public:
   void begin(uint8_t stepPin, uint8_t dirPin);
-  
-  // Set speed in steps per second (negative = reverse)
-  void setSpeed(float stepsPerSec);
-  
-  // Get current speed
-  float getSpeed() const { return _targetSps; }
-  
-  // Called by ISR - do not call directly
+
+  // signed steps/sec: + forward, - reverse
+  void setSpeedSps(float sps);
+
+  // immediate stop (interval=0)
+  void stop();
+
+  // ISR handler
+#if defined(ESP8266)
+  static void ICACHE_RAM_ATTR onTimer();
+#else
   static void IRAM_ATTR onTimer();
+#endif
 
 private:
-  static StepperISR* _instance;
-  
+  static StepperISR* self;
+
   uint8_t _stepPin = 0;
-  uint8_t _dirPin = 0;
-  
-  volatile float _targetSps = 0;
-  volatile bool _dirFwd = true;
-  volatile uint32_t _stepInterval = 0;  // microseconds between steps
-  volatile bool _enabled = false;
+  uint8_t _dirPin  = 0;
+
+  // Shared with ISR (keep it primitive)
+  volatile uint32_t _intervalUs = 0; // 0 => stopped
+  volatile bool     _dirFwd     = true;
+  volatile bool     _enabled    = false;
+
+#if defined(ESP32)
+  void* _timer = nullptr; // hw_timer_t*
+#endif
 };
 
 extern StepperISR stepperISR;
