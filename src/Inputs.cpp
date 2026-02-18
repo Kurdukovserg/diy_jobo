@@ -5,11 +5,9 @@ void Inputs::begin() {
   pinMode(PIN_ENC_B, INPUT_PULLUP);
   pinMode(PIN_ENC_SW, INPUT_PULLUP);
 
-  pinMode(PIN_BTN_OK, INPUT_PULLUP);
   pinMode(PIN_BTN_BACK, INPUT_PULLUP);
 
   _lastEncA = digitalRead(PIN_ENC_A);
-  _lastOk = digitalRead(PIN_BTN_OK);
   _lastBack = digitalRead(PIN_BTN_BACK);
   _lastEncSw = digitalRead(PIN_ENC_SW);
 

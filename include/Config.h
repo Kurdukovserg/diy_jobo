@@ -31,15 +31,15 @@ constexpr uint16_t DISCOVERY_PORT = 45454;
   // ESP8266 NodeMCU pins
   constexpr uint8_t PIN_STEP = D4;   // GPIO2
   constexpr uint8_t PIN_DIR  = D8;   // GPIO15
-  constexpr uint8_t PIN_ENC_A    = D7;   // encoder CLK
-  constexpr uint8_t PIN_ENC_B    = D3;   // encoder DT
-  constexpr uint8_t PIN_ENC_SW   = D6;   // encoder push button (was showing as OK)
-  constexpr uint8_t PIN_BTN_OK   = 3;    // GPIO3 (RX) - OK button (or unused)
-  constexpr uint8_t PIN_BTN_BACK = D0;   // BACK button (stop/menu/exit)
-  constexpr uint8_t PIN_DS18B20 = D5;
-  constexpr uint8_t PIN_SDA = D2;
-  constexpr uint8_t PIN_SCL = D1;
-  constexpr uint8_t PIN_BUZZER = 10;  // GPIO10 (SD3) - adjust if not available on your board
+  constexpr uint8_t PIN_ENC_A    = D7;   // encoder CLK (GPIO13)
+  constexpr uint8_t PIN_ENC_B    = D3;   // encoder DT (GPIO0)
+  constexpr uint8_t PIN_ENC_SW   = D6;   // encoder push button (GPIO12)
+  // OK button is on A0 (analog) - handled in Inputs.cpp
+  constexpr uint8_t PIN_BTN_BACK = D0;   // BACK button (GPIO16)
+  constexpr uint8_t PIN_DS18B20 = D5;    // GPIO14
+  constexpr uint8_t PIN_SDA = D2;        // GPIO4
+  constexpr uint8_t PIN_SCL = D1;        // GPIO5
+  constexpr uint8_t PIN_BUZZER = 3;      // GPIO3 (RX) - keeps Serial.print() working
 #endif
 
 // Motor parameters (NEMA17 + TMC2209)
