@@ -18,10 +18,15 @@ void Inputs::begin() {
   cfg.releaseThreshold = 300;
   cfg.debounceMs = 60;
   _a0Back.begin(cfg);
+  
+  _startupMs = millis();
 }
 
 InputsSnapshot Inputs::tick() {
   InputsSnapshot s{};
+  
+  // Ignore button presses during startup (analog settling)
+  bool ignoreButtons = (millis() - _startupMs) < STARTUP_IGNORE_MS;
 
   // --- encoder (polling, falling edge only, debounced by time) ---
   int a = digitalRead(PIN_ENC_A);
@@ -39,22 +44,44 @@ InputsSnapshot Inputs::tick() {
     _lastEncA = a;
   }
 
-  // --- gpio buttons (one-shot on press) ---
-  bool ok = digitalRead(PIN_BTN_OK);
-  if (ok == LOW && _lastOk == HIGH) s.okPressed = true;
-  _lastOk = ok;
+  // --- OK button via A0 (pulled up, LOW = pressed) ---
+  _a0Back.tick();
+  s.okDown = _a0Back.isPressed();
+  if (_a0Back.wasPressed() && !ignoreButtons) s.okPressed = true;
 
   bool back = digitalRead(PIN_BTN_BACK);
+  s.backDown = (back == LOW);
   if (back == LOW && _lastBack == HIGH) s.backPressed = true;
   _lastBack = back;
 
-  bool sw = digitalRead(PIN_ENC_SW);
-  if (sw == LOW && _lastEncSw == HIGH) s.encSwPressed = true;
-  _lastEncSw = sw;
+bool sw = digitalRead(PIN_ENC_SW);
+uint32_t nowMs = millis();
 
-  // --- analog A0 back ---
-  _a0Back.tick();
-  if (_a0Back.wasPressed()) s.a0BackPressed = true;
+s.encSwRawHigh = (sw == HIGH);
+s.encSwDown = (sw == LOW);
+
+// Long press detection
+if (sw == LOW && _lastEncSw == HIGH) {
+  // Just pressed - start timing
+  _encSwDownMs = nowMs;
+  _encSwLongFired = false;
+}
+if (sw == LOW && !_encSwLongFired && (nowMs - _encSwDownMs >= LONG_PRESS_MS)) {
+  // Long press threshold reached
+  s.encSwLongPress = true;
+  _encSwLongFired = true;
+}
+if (sw == HIGH && _lastEncSw == LOW) {
+  // Released - short press only if long wasn't fired
+  if (!_encSwLongFired) {
+    s.encSwPressed = true;
+  }
+}
+_lastEncSw = sw;
+
+  // A0 now used for OK, clear old a0Back fields
+  s.a0BackDown = false;
+  s.a0BackPressed = false;
 
   return s;
 }

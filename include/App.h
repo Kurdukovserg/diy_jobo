@@ -1,6 +1,12 @@
 #pragma once
+#include <cstdint>
 #include <Arduino.h>
 #include "Inputs.h"
+#include "Ui.h"
+#include "TempSensor.h"
+#include "MotorController.h"
+#include "SessionController.h"
+#include "MenuController.h"
 
 class App {
 public:
@@ -9,14 +15,13 @@ public:
 
 private:
   Inputs _in;
+  Ui _ui;
+  TempSensor _temp;
+  MotorController _motor;
+  SessionController _session;
+  MenuController _menu;
 
-  // simple state
-  bool _run = false;
-  int32_t _rpm = 30;
+  UiModel _uiModel{};
 
-  static constexpr int RPM_MIN = 1;
-  static constexpr int RPM_MAX = 80;
-
-  void handleInputs(const InputsSnapshot& s);
-  void clampRpm();
+  void updateUiModel(const InputsSnapshot& s);
 };

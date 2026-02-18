@@ -4,27 +4,31 @@
 class AnalogButton {
 public:
   struct Config {
-    uint16_t pressThreshold   = 700;  // > = pressed
-    uint16_t releaseThreshold = 300;  // < = released
-    uint16_t debounceMs       = 40;
+    uint16_t pressThreshold;
+    uint16_t releaseThreshold;
+    uint16_t debounceMs;
+
+    // explicit defaults to avoid toolchain quirks
+    Config()
+      : pressThreshold(700),
+        releaseThreshold(300),
+        debounceMs(50) {}
   };
 
-  void begin(const Config& cfg = Config{});
-  void tick();   // викликати в loop()
+  void begin();                     // use defaults
+  void begin(const Config& cfg);    // custom config
+  void tick();
 
-  bool isPressed() const { return _stablePressed; }
-
-  // edge events (true тільки 1 тик)
-  bool wasPressed();
-  bool wasReleased();
+  bool isPressed() const { return _pressed; }
+  bool wasPressed();    // one-shot
+  bool wasReleased();   // one-shot
 
 private:
   Config _cfg{};
+  bool _pressed = false;
 
-  bool _stablePressed = false;
-  bool _lastReported  = false;
-
-  uint32_t _lastChangeMs = 0;
-  bool _edgePressed  = false;
+  bool _edgePressed = false;
   bool _edgeReleased = false;
+
+  uint32_t _lastFlipMs = 0;
 };
