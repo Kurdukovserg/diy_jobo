@@ -19,7 +19,11 @@ enum class Screen : uint8_t {
   EditTempCoefEnabled,
   EditTempCoefBase,
   EditTempCoefPercent,
-  EditTempCoefTarget
+  EditTempCoefTarget,
+  // Temp limits submenu
+  EditTempLimitsEnabled,
+  EditTempMin,
+  EditTempMax
 };
 
 class MenuController {
@@ -43,6 +47,9 @@ public:
   float editTempCoefBase() const { return _editTempCoefBase; }
   float editTempCoefPercent() const { return _editTempCoefPercent; }
   TempCoefTarget editTempCoefTarget() const { return _editTempCoefTarget; }
+  bool editTempLimitsEnabled() const { return _editTempLimitsEnabled; }
+  float editTempMin() const { return _editTempMin; }
+  float editTempMax() const { return _editTempMax; }
 
 private:
   SessionController* _session = nullptr;
@@ -62,6 +69,9 @@ private:
   float _editTempCoefBase = 20.0f;
   float _editTempCoefPercent = 10.0f;
   TempCoefTarget _editTempCoefTarget = TempCoefTarget::Timer;
+  bool _editTempLimitsEnabled = false;
+  float _editTempMin = 18.0f;
+  float _editTempMax = 24.0f;
 
   static constexpr int RPM_MIN = 1;
   static constexpr int RPM_MAX = 80;
@@ -82,4 +92,8 @@ private:
   bool handleEditTempCoefBase(const InputsSnapshot& s);
   bool handleEditTempCoefPercent(const InputsSnapshot& s);
   bool handleEditTempCoefTarget(const InputsSnapshot& s);
+  // Temp limits
+  bool handleEditTempLimitsEnabled(const InputsSnapshot& s);
+  bool handleEditTempMin(const InputsSnapshot& s);
+  bool handleEditTempMax(const InputsSnapshot& s);
 };

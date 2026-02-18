@@ -33,6 +33,7 @@ void App::tick() {
   InputsSnapshot s = _in.tick();
   _menu.handleInput(s);
   _temp.tick();
+  _session.setCurrentTemp(_temp.tempC());
   _session.tick();
   
   updateUiModel(s);
@@ -53,6 +54,7 @@ void App::updateUiModel(const InputsSnapshot& s) {
   
   // RPM
   _uiModel.rpm = (scr == Screen::EditRpm) ? _menu.editRpm() : set.targetRpm;
+  _uiModel.adjustedRpm = _session.adjustedRpm();
   
   // Reverse
   _uiModel.reverseEnabled = (scr == Screen::EditReverseEnabled) ? _menu.editReverseEnabled() : set.reverseEnabled;
@@ -64,6 +66,9 @@ void App::updateUiModel(const InputsSnapshot& s) {
   _uiModel.stepRemainingSec = _session.stepRemainingSec();
   _uiModel.totalRemainingSec = _session.totalRemainingSec();
   _uiModel.isPaused = _session.isPaused();
+  for (int8_t i = 0; i < set.stepCount && i < 10; i++) {
+    _uiModel.stepDurations[i] = set.steps[i].durationSec;
+  }
   
   // Edit step values
   _uiModel.editStepIdx = _menu.editStepIdx();
@@ -74,6 +79,14 @@ void App::updateUiModel(const InputsSnapshot& s) {
   _uiModel.tempCoefBase = (scr == Screen::EditTempCoefBase) ? _menu.editTempCoefBase() : set.tempCoefBase;
   _uiModel.tempCoefPercent = (scr == Screen::EditTempCoefPercent) ? _menu.editTempCoefPercent() : set.tempCoefPercent;
   _uiModel.tempCoefTarget = (scr == Screen::EditTempCoefTarget) ? _menu.editTempCoefTarget() : set.tempCoefTarget;
+
+  // Temperature limits
+  _uiModel.tempLimitsEnabled = (scr == Screen::EditTempLimitsEnabled) ? _menu.editTempLimitsEnabled() : set.tempLimitsEnabled;
+  _uiModel.tempMin = (scr == Screen::EditTempMin) ? _menu.editTempMin() : set.tempMin;
+  _uiModel.tempMax = (scr == Screen::EditTempMax) ? _menu.editTempMax() : set.tempMax;
+  _uiModel.tempAlarm = _session.isTempAlarm();
+  _uiModel.tempLow = _session.isTempLow();
+  _uiModel.tempHigh = _session.isTempHigh();
 
   _uiModel.hasTemp = _temp.hasSensor();
   _uiModel.tempC = _temp.tempC();

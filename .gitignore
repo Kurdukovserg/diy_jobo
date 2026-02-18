@@ -3,3 +3,11 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+/.idea/vcs.xml
+/.idea/swift-toolchain.xml
+/.idea/modules.xml
+/.idea/misc.xml
+/.idea/markdown.xml
+/.idea/GitLink.xml
+/.idea/diy_jobo.iml
+/.idea/caches/deviceStreaming.xml

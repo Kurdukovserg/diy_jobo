@@ -50,6 +50,16 @@ bool MenuController::handleInput(const InputsSnapshot& s) {
     case Screen::EditTempCoefTarget:
       settingsChanged = handleEditTempCoefTarget(s);
       break;
+    // Temp limits
+    case Screen::EditTempLimitsEnabled:
+      settingsChanged = handleEditTempLimitsEnabled(s);
+      break;
+    case Screen::EditTempMin:
+      settingsChanged = handleEditTempMin(s);
+      break;
+    case Screen::EditTempMax:
+      settingsChanged = handleEditTempMax(s);
+      break;
   }
   
   return settingsChanged;
@@ -268,7 +278,7 @@ bool MenuController::handleEditReverseInterval(const InputsSnapshot& s) {
 
 // ===== TempCoef Submenu =====
 void MenuController::handleTempCoefMenu(const InputsSnapshot& s) {
-  const int8_t ITEMS = 4;  // Enabled, Base, Percent, Target
+  const int8_t ITEMS = 7;  // Enabled, Base, Percent, Target, LimitsEnabled, Min, Max
   
   if (s.encDelta != 0) {
     _subMenuIdx += s.encDelta;
@@ -294,6 +304,18 @@ void MenuController::handleTempCoefMenu(const InputsSnapshot& s) {
       case 3:
         _editTempCoefTarget = set.tempCoefTarget;
         _screen = Screen::EditTempCoefTarget;
+        break;
+      case 4:
+        _editTempLimitsEnabled = set.tempLimitsEnabled;
+        _screen = Screen::EditTempLimitsEnabled;
+        break;
+      case 5:
+        _editTempMin = set.tempMin;
+        _screen = Screen::EditTempMin;
+        break;
+      case 6:
+        _editTempMax = set.tempMax;
+        _screen = Screen::EditTempMax;
         break;
     }
   }
@@ -376,6 +398,68 @@ bool MenuController::handleEditTempCoefTarget(const InputsSnapshot& s) {
 
   if (s.okPressed || s.encSwPressed) {
     _session->settings().tempCoefTarget = _editTempCoefTarget;
+    _screen = Screen::TempCoefMenu;
+    changed = true;
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::TempCoefMenu;
+  }
+  
+  return changed;
+}
+
+// ===== Temp Limits =====
+bool MenuController::handleEditTempLimitsEnabled(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    _editTempLimitsEnabled = !_editTempLimitsEnabled;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    _session->settings().tempLimitsEnabled = _editTempLimitsEnabled;
+    _screen = Screen::TempCoefMenu;
+    changed = true;
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::TempCoefMenu;
+  }
+  
+  return changed;
+}
+
+bool MenuController::handleEditTempMin(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    _editTempMin += s.encDelta * 0.5f;
+    if (_editTempMin < 10.0f) _editTempMin = 10.0f;
+    if (_editTempMin > _editTempMax - 1.0f) _editTempMin = _editTempMax - 1.0f;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    _session->settings().tempMin = _editTempMin;
+    _screen = Screen::TempCoefMenu;
+    changed = true;
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::TempCoefMenu;
+  }
+  
+  return changed;
+}
+
+bool MenuController::handleEditTempMax(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    _editTempMax += s.encDelta * 0.5f;
+    if (_editTempMax < _editTempMin + 1.0f) _editTempMax = _editTempMin + 1.0f;
+    if (_editTempMax > 40.0f) _editTempMax = 40.0f;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    _session->settings().tempMax = _editTempMax;
     _screen = Screen::TempCoefMenu;
     changed = true;
   }

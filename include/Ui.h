@@ -15,6 +15,7 @@ struct UiModel {
   
   bool run = false;
   int32_t rpm = 0;
+  float adjustedRpm = 0.0f;  // RPM after temp coefficient applied
   float currentRpm = 0.0f;
   bool dirFwd = true;
   
@@ -28,6 +29,7 @@ struct UiModel {
   int32_t stepRemainingSec = 0;
   int32_t totalRemainingSec = 0;
   bool isPaused = false;  // paused between steps
+  int32_t stepDurations[10] = {0};  // durations for display in StepsMenu
   
   // For edit screen
   int8_t editStepIdx = 0;
@@ -38,6 +40,14 @@ struct UiModel {
   float tempCoefBase = 20.0f;
   float tempCoefPercent = 10.0f;
   TempCoefTarget tempCoefTarget;
+  
+  // Temperature limits
+  bool tempLimitsEnabled = false;
+  float tempMin = 18.0f;
+  float tempMax = 24.0f;
+  bool tempAlarm = false;
+  bool tempLow = false;
+  bool tempHigh = false;
 
   bool hasTemp = false;
   float tempC = NAN;
@@ -84,4 +94,8 @@ private:
   void drawEditTempCoefBase(const UiModel& m);
   void drawEditTempCoefPercent(const UiModel& m);
   void drawEditTempCoefTarget(const UiModel& m);
+  // Temp limits
+  void drawEditTempLimitsEnabled(const UiModel& m);
+  void drawEditTempMin(const UiModel& m);
+  void drawEditTempMax(const UiModel& m);
 };

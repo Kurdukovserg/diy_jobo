@@ -32,6 +32,11 @@ struct SessionSettings {
   float tempCoefPercent = 10.0f;
   TempCoefTarget tempCoefTarget = TempCoefTarget::Timer;
   
+  // Temperature limits (alarm if outside range)
+  bool tempLimitsEnabled = false;
+  float tempMin = 18.0f;
+  float tempMax = 24.0f;
+  
   // Helper to get total duration
   int32_t totalDurationSec() const {
     int32_t total = 0;
@@ -74,6 +79,19 @@ public:
   // Apply settings to motor
   void applyToMotor();
 
+  // Temperature for coefficient calculation
+  void setCurrentTemp(float tempC) { _currentTempC = tempC; }
+  float currentTemp() const { return _currentTempC; }
+  
+  // Get adjusted values (with temp coefficient applied)
+  float adjustedRpm() const;
+  int32_t adjustedStepDurationSec(int8_t stepIdx) const;
+  
+  // Temperature alarm
+  bool isTempAlarm() const { return _tempAlarm; }
+  bool isTempLow() const { return _tempLow; }
+  bool isTempHigh() const { return _tempHigh; }
+
 private:
   MotorController* _motor = nullptr;
   SessionSettings _settings;
@@ -85,7 +103,13 @@ private:
   int8_t _currentStep = 0;    // current step index (0-based)
   uint32_t _stepStartMs = 0;
   uint32_t _stepPausedMs = 0;
+  float _currentTempC = NAN;
+  bool _tempAlarm = false;
+  bool _tempLow = false;
+  bool _tempHigh = false;
 
+  void checkTempLimits();
+  float calcTempCoefMultiplier() const;
   void updateTimer();
   void resetTimer();
 };
