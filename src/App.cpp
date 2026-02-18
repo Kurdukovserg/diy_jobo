@@ -39,7 +39,7 @@ void App::tick() {
   _temp.tick();
   _session.setCurrentTemp(_temp.tempC());
   _session.tick();
-  _buzzer.tickQueued();
+  _buzzer.tick();
   
   checkBuzzerEvents();
   updateUiModel(s);
@@ -117,17 +117,21 @@ void App::checkBuzzerEvents() {
   
   // Step completed (entered pause state)
   if (running && paused && _prevStep != step) {
-    _buzzer.doubleClick();
+    _buzzer.alert(AlertType::StepFinished);
   }
   
   // Session completed (was running, now stopped and finished all steps)
   if (_prevRunning && !running && step >= _session.settings().stepCount) {
-    _buzzer.doubleClick();
+    _buzzer.alert(AlertType::ProcessEnded);
   }
   
   // Temperature alarm started
   if (tempAlarm && !_prevTempAlarm) {
-    _buzzer.click();
+    _buzzer.alert(AlertType::TempWarning);
+  }
+  // Temperature alarm cleared
+  if (!tempAlarm && _prevTempAlarm) {
+    _buzzer.stopAlert();
   }
   
   _prevStep = step;
