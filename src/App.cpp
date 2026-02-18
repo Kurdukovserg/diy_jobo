@@ -27,7 +27,10 @@ void App::begin() {
   
   _session.begin(&_motor);
   _menu.begin(&_session);
-  _buzzer.begin(PIN_BUZZER);
+  
+  Buzzer::Config bcfg;
+  bcfg.pin = PIN_BUZZER;
+  _buzzer.begin(bcfg);
 }
 
 void App::tick() {
@@ -36,7 +39,7 @@ void App::tick() {
   _temp.tick();
   _session.setCurrentTemp(_temp.tempC());
   _session.tick();
-  _buzzer.tick();
+  _buzzer.tickQueued();
   
   checkBuzzerEvents();
   updateUiModel(s);
@@ -114,21 +117,17 @@ void App::checkBuzzerEvents() {
   
   // Step completed (entered pause state)
   if (running && paused && _prevStep != step) {
-    _buzzer.play(BuzzerPattern::StepDone);
+    _buzzer.doubleClick();
   }
   
   // Session completed (was running, now stopped and finished all steps)
   if (_prevRunning && !running && step >= _session.settings().stepCount) {
-    _buzzer.play(BuzzerPattern::SessionDone);
+    _buzzer.doubleClick();
   }
   
   // Temperature alarm started
   if (tempAlarm && !_prevTempAlarm) {
-    _buzzer.play(BuzzerPattern::Alarm);
-  }
-  // Temperature alarm cleared
-  if (!tempAlarm && _prevTempAlarm) {
-    _buzzer.stop();
+    _buzzer.click();
   }
   
   _prevStep = step;
