@@ -7,6 +7,7 @@
 #include "MotorController.h"
 #include "SessionController.h"
 #include "MenuController.h"
+#include "Buzzer.h"
 
 class App {
 public:
@@ -20,8 +21,14 @@ private:
   MotorController _motor;
   SessionController _session;
   MenuController _menu;
+  Buzzer _buzzer;
 
   UiModel _uiModel{};
+  
+  bool _prevTempAlarm = false;
+  int8_t _prevStep = -1;
+  bool _prevRunning = false;
 
   void updateUiModel(const InputsSnapshot& s);
+  void checkBuzzerEvents();
 };

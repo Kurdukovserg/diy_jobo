@@ -26,6 +26,7 @@ constexpr uint16_t DISCOVERY_PORT = 45454;
   constexpr uint8_t PIN_DS18B20  = 4;
   constexpr uint8_t PIN_SDA = 21;
   constexpr uint8_t PIN_SCL = 22;
+  constexpr uint8_t PIN_BUZZER = 25;
 #else
   // ESP8266 NodeMCU pins
   constexpr uint8_t PIN_STEP = D4;   // GPIO2
@@ -38,6 +39,7 @@ constexpr uint16_t DISCOVERY_PORT = 45454;
   constexpr uint8_t PIN_DS18B20 = D5;
   constexpr uint8_t PIN_SDA = D2;
   constexpr uint8_t PIN_SCL = D1;
+  constexpr uint8_t PIN_BUZZER = 10;  // GPIO10 (SD3) - adjust if not available on your board
 #endif
 
 // Motor parameters (NEMA17 + TMC2209)

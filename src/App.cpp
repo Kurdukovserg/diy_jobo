@@ -27,6 +27,7 @@ void App::begin() {
   
   _session.begin(&_motor);
   _menu.begin(&_session);
+  _buzzer.begin(PIN_BUZZER);
 }
 
 void App::tick() {
@@ -35,7 +36,9 @@ void App::tick() {
   _temp.tick();
   _session.setCurrentTemp(_temp.tempC());
   _session.tick();
+  _buzzer.tick();
   
+  checkBuzzerEvents();
   updateUiModel(s);
   _ui.tick(_uiModel);
 }
@@ -101,4 +104,34 @@ void App::updateUiModel(const InputsSnapshot& s) {
   _uiModel.backEvent = s.backPressed;
   _uiModel.a0BackEvent = s.a0BackPressed;
   _uiModel.encSwRawHigh = s.encSwRawHigh;
+}
+
+void App::checkBuzzerEvents() {
+  bool running = _session.isRunning();
+  int8_t step = _session.currentStep();
+  bool paused = _session.isPaused();
+  bool tempAlarm = _session.isTempAlarm();
+  
+  // Step completed (entered pause state)
+  if (running && paused && _prevStep != step) {
+    _buzzer.play(BuzzerPattern::StepDone);
+  }
+  
+  // Session completed (was running, now stopped and finished all steps)
+  if (_prevRunning && !running && step >= _session.settings().stepCount) {
+    _buzzer.play(BuzzerPattern::SessionDone);
+  }
+  
+  // Temperature alarm started
+  if (tempAlarm && !_prevTempAlarm) {
+    _buzzer.play(BuzzerPattern::Alarm);
+  }
+  // Temperature alarm cleared
+  if (!tempAlarm && _prevTempAlarm) {
+    _buzzer.stop();
+  }
+  
+  _prevStep = step;
+  _prevRunning = running;
+  _prevTempAlarm = tempAlarm;
 }
