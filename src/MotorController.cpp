@@ -1,228 +1,106 @@
 #include "MotorController.h"
-#include "Config.h"
+#include "StepperISR.h"
 #include <math.h>
 
-void MotorController::begin(uint8_t stepPin, uint8_t dirPin, int rpm, bool dirFwd, RevParams rev, MotionParams motion) {
-  stepperISR.begin(stepPin, dirPin);
-  
-  _rpm = rpm;
-  _dirFwd = dirFwd;
-  _rev = rev;
-  _motion = motion;
-
-  recomputeTarget();
-  _currentSps = 0.0f;
-  setSpeed(0.0f);
-
-  _revPhase = RevPhase::None;
-  _rampPhase = RampPhase::None;
-  _running = false;
+void MotorController::begin(const MotorConfig& cfg) {
+  _cfg = cfg;
+  _lastUs = micros();
+  _lastReverseMs = millis();
 }
 
-void MotorController::setRpm(int rpm) {
-  _rpm = rpm;
-  recomputeTarget();
-  // Don't jump to new speed - let tick() smoothly transition via setSpeed()
-  // The target is updated, motor will naturally adjust on next runSpeed() calls
-}
-
-void MotorController::setDir(bool fwd) {
-  _dirFwd = fwd;
-  recomputeTarget();
-
-  if (_running && _revPhase == RevPhase::None && _rampPhase == RampPhase::None) {
-    _currentSps = _targetSps;
-    setSpeed(_currentSps);
+void MotorController::setRun(bool run) {
+  _run = run;
+  if (!run) {
+    _targetRpm = 0.0f;
+    _rs = RS_RUN;
   }
 }
 
-void MotorController::setRevParams(RevParams p) { _rev = p; }
-void MotorController::setMotionParams(MotionParams p) { _motion = p; }
-
-float MotorController::stepsPerSecFromRpm(int rpm) const {
-  return (rpm * (float)STEPS_EFF) / 60.0f;
+void MotorController::setTargetRpm(float rpm) {
+  if (rpm < 0) rpm = 0;
+  // clamp - для JOBO більше 80 зазвичай не треба
+  if (rpm > 120) rpm = 120;
+  _targetRpm = rpm;
 }
 
-float MotorController::ease(float t) const {
-  return t * t * (3.0f - 2.0f * t);
+void MotorController::setReverseEnabled(bool en) {
+  _cfg.reverseEnabled = en;
 }
 
-void MotorController::recomputeTarget() {
-  float mag = stepsPerSecFromRpm(_rpm);
-  _targetSps = _dirFwd ? mag : -mag;
+void MotorController::setReverseEverySec(float sec) {
+  if (sec < 0) sec = 0;
+  _cfg.reverseEverySec = sec;
 }
 
-void MotorController::setSpeed(float spsSigned) {
-  stepperISR.setSpeed(spsSigned);
-}
-
-void MotorController::startRampUp() {
-  _rampPhase = RampPhase::Up;
-  _phaseStartMs = millis();
-  _rampStartSps = 0.0f;
-}
-
-void MotorController::startRampDown() {
-  _rampPhase = RampPhase::Down;
-  _phaseStartMs = millis();
-  _rampStartSps = _currentSps;
-}
-
-void MotorController::tickRamp() {
-  if (_rampPhase == RampPhase::None) return;
-
-  unsigned long now = millis();
-  uint16_t dur = (_rampPhase == RampPhase::Up) ? _motion.startRampMs : _motion.stopRampMs;
-  if (dur < 50) dur = 50;
-
-  float t = (now - _phaseStartMs) / float(dur);
-
-  if (t >= 1.0f) {
-    if (_rampPhase == RampPhase::Up) {
-      _currentSps = _targetSps;
-      setSpeed(_currentSps);
-    } else {
-      _currentSps = 0.0f;
-      setSpeed(0.0f);
-    }
-    _rampPhase = RampPhase::None;
-    return;
-  }
-
-  t = constrain(t, 0.0f, 1.0f);
-  float k = ease(t);
-
-  if (_rampPhase == RampPhase::Up) {
-    _currentSps = _targetSps * k;
-  } else {
-    _currentSps = _rampStartSps * (1.0f - k);
-  }
-  setSpeed(_currentSps);
-}
-
-bool MotorController::isActivelySpinning() const {
-  return _running && fabsf(_currentSps) > 1.0f;
-}
-
-void MotorController::start() {
-  recomputeTarget();
-  _running = true;
-  if (_revPhase == RevPhase::None) startRampUp();
-}
-
-void MotorController::stop() {
-  // stop має пріоритет над reverse
-  _revPhase = RevPhase::None;
-  startRampDown();
-  _running = false;
-}
-
-void MotorController::startSoftReverse() {
-  if (_revPhase != RevPhase::None) return;
-  _revPhase = RevPhase::RampDown;
-  _phaseStartMs = millis();
-  _rampStartSps = _currentSps;
-}
-
-void MotorController::requestReverse() {
-  if (_revPhase != RevPhase::None || _rampPhase != RampPhase::None) return;
-
-  if (!isActivelySpinning()) {
-    _dirFwd = !_dirFwd;
-    recomputeTarget();
-    if (_running) {
-      _currentSps = _targetSps;
-      setSpeed(_currentSps);
-    }
-    return;
-  }
-
-  startSoftReverse();
-}
-
-void MotorController::tickSoftReverse() {
-  if (_revPhase == RevPhase::None) return;
-
-  unsigned long now = millis();
-
-  if (_revPhase == RevPhase::RampDown) {
-    float t = (now - _phaseStartMs) / float(_rev.rampMs);
-    if (t >= 1.0f) {
-      _currentSps = 0.0f;
-      setSpeed(0.0f);
-      _revPhase = RevPhase::Pause;
-      _phaseStartMs = now;
-      return;
-    }
-    t = constrain(t, 0.0f, 1.0f);
-    float k = 1.0f - ease(t);
-    _currentSps = _rampStartSps * k;
-    setSpeed(_currentSps);
-    return;
-  }
-
-  if (_revPhase == RevPhase::Pause) {
-    if (now - _phaseStartMs >= _rev.pauseMs) {
-      _dirFwd = !_dirFwd;
-      recomputeTarget();
-      _revPhase = RevPhase::RampUp;
-      _phaseStartMs = now;
-    }
-    return;
-  }
-
-  if (_revPhase == RevPhase::RampUp) {
-    float t = (now - _phaseStartMs) / float(_rev.rampMs);
-    if (t >= 1.0f) {
-      _currentSps = _targetSps;
-      setSpeed(_currentSps);
-      _revPhase = RevPhase::None;
-      return;
-    }
-    t = constrain(t, 0.0f, 1.0f);
-    float k = ease(t);
-    _currentSps = _targetSps * k;
-    setSpeed(_currentSps);
-    return;
-  }
+float MotorController::rpmToSps(float rpm) const {
+  float stepsEff = (float)_cfg.stepsPerRev * (float)_cfg.microsteps;
+  return rpm * stepsEff / 60.0f;
 }
 
 void MotorController::tick() {
-  tickRamp();
-  tickSoftReverse();
+  uint32_t nowUs = micros();
+  float dt = (nowUs - _lastUs) / 1000000.0f;
+  _lastUs = nowUs;
+  if (dt <= 0) return;
 
-  // When running steady (no ramp/reverse), smoothly adjust to target if RPM changed
-  if (_running && _revPhase == RevPhase::None && _rampPhase == RampPhase::None) {
-    if (fabsf(_currentSps - _targetSps) > 1.0f) {
-      // Smooth transition: move 5% toward target each tick
-      _currentSps += (_targetSps - _currentSps) * 0.05f;
-      setSpeed(_currentSps);
-    } else if (fabsf(_currentSps - _targetSps) > 0.1f) {
-      _currentSps = _targetSps;
-      setSpeed(_currentSps);
+  uint32_t nowMs = millis();
+
+  // reverse trigger
+  bool reverseDue =
+      _run &&
+      _cfg.reverseEnabled &&
+      _cfg.reverseEverySec > 0.1f &&
+      (nowMs - _lastReverseMs) >= (uint32_t)(_cfg.reverseEverySec * 1000.0f);
+
+  if (reverseDue && _rs == RS_RUN) {
+    _lastReverseMs = nowMs;
+    _savedTarget = _targetRpm;
+    _rs = RS_RAMP_DOWN;
+  }
+
+  float effectiveTarget = 0.0f;
+
+  if (!_run) {
+    effectiveTarget = 0.0f;
+    _rs = RS_RUN;
+  } else {
+    switch (_rs) {
+      case RS_RUN:        effectiveTarget = _targetRpm;   break;
+      case RS_RAMP_DOWN:  effectiveTarget = 0.0f;         break;
+      case RS_SWITCH_DIR: effectiveTarget = 0.0f;         break;
+      case RS_RAMP_UP:    effectiveTarget = _savedTarget; break;
     }
   }
 
-  if (!_running && _revPhase == RevPhase::None && _rampPhase == RampPhase::None) {
-    if (fabsf(_currentSps) > 0.0f) {
-      _currentSps = 0.0f;
-      setSpeed(0.0f);
+  // time-based ramp
+  float maxDelta = _cfg.accelRpmPerSec * dt;
+  float diff = effectiveTarget - _currentRpm;
+
+  if (fabs(diff) <= maxDelta) _currentRpm = effectiveTarget;
+  else _currentRpm += (diff > 0 ? maxDelta : -maxDelta);
+
+  // reverse transitions at zero
+  if (_run) {
+    if (_rs == RS_RAMP_DOWN && _currentRpm <= 0.01f) {
+      _rs = RS_SWITCH_DIR;
+    }
+    if (_rs == RS_SWITCH_DIR) {
+      _dirFwd = !_dirFwd;
+      _rs = RS_RAMP_UP;
+    }
+    if (_rs == RS_RAMP_UP && fabs(_currentRpm - _savedTarget) <= 0.01f) {
+      _rs = RS_RUN;
     }
   }
-}
 
-void MotorController::run() {
-  // No-op: stepping is now handled by timer interrupt in StepperISR
-}
+  // push to stepper
+  if (!_run || _currentRpm <= 0.01f) {
+    stepperISR.stop();
+    return;
+  }
 
-bool MotorController::isStopped() const {
-  return (fabsf(_currentSps) < 0.5f) &&
-         (_rampPhase == RampPhase::None) &&
-         (_revPhase == RevPhase::None);
-}
+  float sps = rpmToSps(_currentRpm);
+  if (!_dirFwd) sps = -sps;
 
-bool MotorController::shouldRun() const {
-  return (fabsf(_currentSps) > 0.5f) ||
-         (_rampPhase != RampPhase::None) ||
-         (_revPhase != RevPhase::None);
+  stepperISR.setSpeedSps(sps);
 }

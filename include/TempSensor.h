@@ -8,20 +8,25 @@ public:
   void begin(uint8_t pin);
   void tick();
 
-  bool hasReading() const { return _hasReading; }
+  bool ok() const { return _hasSensor && !isnan(_tempC); }
+  bool hasSensor() const { return _hasSensor; }
   float tempC() const { return _tempC; }
 
 private:
-  OneWire* _oneWire = nullptr;
-  DallasTemperature* _sensors = nullptr;
-  DeviceAddress _addr;
+  OneWire* _ow = nullptr;
+  DallasTemperature* _dt = nullptr;
 
-  bool _found = false;
-  bool _hasReading = false;
+  DeviceAddress _addr{};
+  bool _hasSensor = false;
+
   float _tempC = NAN;
 
-  enum Phase { Idle, Requested };
-  Phase _phase = Idle;
-  uint32_t _phaseTs = 0;
+  enum Phase { IDLE, WAIT };
+  Phase _phase = IDLE;
+
   uint32_t _lastCycleMs = 0;
+  uint32_t _phaseTsMs = 0;
+
+  static constexpr uint32_t PERIOD_MS = 1200;
+  static constexpr uint32_t CONV_WAIT_MS = 800;
 };

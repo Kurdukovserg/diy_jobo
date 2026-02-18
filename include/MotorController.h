@@ -1,63 +1,45 @@
 #pragma once
 #include <Arduino.h>
-#include "Types.h"
-#include "StepperISR.h"
+
+struct MotorConfig {
+  int   stepsPerRev = 200;
+  int   microsteps  = 16;
+
+  float accelRpmPerSec   = 60.0f; // ramp speed
+  bool  reverseEnabled   = true;
+  float reverseEverySec  = 10.0f; // 0 => no reverse
+};
 
 class MotorController {
 public:
-  MotorController() {}
+  void begin(const MotorConfig& cfg);
 
-  void begin(uint8_t stepPin, uint8_t dirPin, int rpm, bool dirFwd, RevParams rev, MotionParams motion);
+  void setRun(bool run);
+  void setTargetRpm(float rpm);     // 0..clamped
+  void setReverseEnabled(bool en);
+  void setReverseEverySec(float sec);
 
-  void setRunning(bool running) { _running = running; }
-  bool running() const { return _running; }
+  void tick(); // call often
 
-  void setRpm(int rpm);
-  void setDir(bool fwd);
-  bool dirFwd() const { return _dirFwd; }
-
-  void setRevParams(RevParams p);
-  void setMotionParams(MotionParams p);
-
-  void start(); // soft start
-  void stop();  // soft stop
-  void requestReverse(); // conditioned
-
-  void tick();
-  void run(); // stepper.runSpeed()
-
-  float currentSps() const { return _currentSps; }
-  bool isReversing() const { return _revPhase != RevPhase::None; }
-  bool isStopped() const;
-  bool shouldRun() const;
+  float currentRpm() const { return _currentRpm; }
+  bool  dirFwd() const { return _dirFwd; }
 
 private:
-  int _rpm = 10;
-  bool _dirFwd = true;
-  bool _running = false;
+  MotorConfig _cfg{};
 
-  RevParams _rev {350,150};
-  MotionParams _motion {350,600};
+  bool  _run = false;
+  bool  _dirFwd = true;
 
-  RevPhase  _revPhase  = RevPhase::None;
-  RampPhase _rampPhase = RampPhase::None;
+  float _targetRpm  = 0.0f; // user target
+  float _currentRpm = 0.0f; // ramped
 
-  unsigned long _phaseStartMs = 0;
+  uint32_t _lastUs = 0;
 
-  float _targetSps = 0.0f;
-  float _currentSps = 0.0f;
-  float _rampStartSps = 0.0f;
+  // soft reverse state machine
+  enum RevState { RS_RUN, RS_RAMP_DOWN, RS_SWITCH_DIR, RS_RAMP_UP };
+  RevState _rs = RS_RUN;
+  float _savedTarget = 0.0f;
+  uint32_t _lastReverseMs = 0;
 
-  float stepsPerSecFromRpm(int rpm) const;
-  float ease(float t) const;
-  void recomputeTarget();
-  void setSpeed(float spsSigned);
-
-  void startRampUp();
-  void startRampDown();
-  void tickRamp();
-
-  bool isActivelySpinning() const;
-  void startSoftReverse();
-  void tickSoftReverse();
+  float rpmToSps(float rpm) const;
 };

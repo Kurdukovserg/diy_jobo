@@ -1,119 +1,98 @@
 #include "StepperISR.h"
+#include <math.h>
 
-StepperISR* StepperISR::_instance = nullptr;
+StepperISR* StepperISR::self = nullptr;
 StepperISR stepperISR;
 
-#if defined(ESP32)
-// ESP32: Use hw_timer
-static hw_timer_t* stepTimer = nullptr;
-static portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
+static inline uint32_t spsToIntervalUs(float spsAbs) {
+  if (spsAbs < 0.5f) return 0;
 
-void IRAM_ATTR StepperISR::onTimer() {
-  if (!_instance || !_instance->_enabled) return;
-  portENTER_CRITICAL_ISR(&timerMux);
-  // Pulse STEP pin (rising edge triggers step on most drivers)
-  GPIO.out_w1ts = (1 << _instance->_stepPin);  // HIGH
-  delayMicroseconds(2);
-  GPIO.out_w1tc = (1 << _instance->_stepPin);  // LOW
-  portEXIT_CRITICAL_ISR(&timerMux);
+  float us = 1000000.0f / spsAbs;
+  // clamp (avoid silly small intervals)
+  if (us < 40.0f) us = 40.0f;
+  return (uint32_t)us;
 }
-
-#else
-// ESP8266: Use timer1
-extern "C" {
-  #include "user_interface.h"
-}
-
-static volatile bool stepHigh = false;
-
-void IRAM_ATTR StepperISR::onTimer() {
-  if (!_instance || !_instance->_enabled) return;
-  
-  // Toggle step pin using direct register access for speed
-  if (stepHigh) {
-    GPOS = (1 << _instance->_stepPin);  // HIGH
-  } else {
-    GPOC = (1 << _instance->_stepPin);  // LOW
-  }
-  stepHigh = !stepHigh;
-}
-
-static void IRAM_ATTR timer1_isr_handler() {
-  StepperISR::onTimer();
-}
-#endif
 
 void StepperISR::begin(uint8_t stepPin, uint8_t dirPin) {
+  self = this;
   _stepPin = stepPin;
-  _dirPin = dirPin;
-  _instance = this;
-  
+  _dirPin  = dirPin;
+
   pinMode(_stepPin, OUTPUT);
   pinMode(_dirPin, OUTPUT);
   digitalWrite(_stepPin, LOW);
   digitalWrite(_dirPin, LOW);
-  
-  _enabled = false;
-  _targetSps = 0;
+
+  _enabled = true;
 
 #if defined(ESP32)
-  // ESP32: Setup timer (timer 0, prescaler 80 = 1MHz tick)
-  stepTimer = timerBegin(0, 80, true);
-  timerAttachInterrupt(stepTimer, &onTimer, true);
-  timerAlarmWrite(stepTimer, 1000, true);  // default 1ms
-  timerAlarmDisable(stepTimer);
-#else
-  // ESP8266: Setup timer1
+  // 1 tick = 1us (80MHz / 80)
+  hw_timer_t* t = timerBegin(0, 80, true);
+  _timer = (void*)t;
+  timerAttachInterrupt(t, &StepperISR::onTimer, true);
+  timerAlarmWrite(t, 20000, true); // slow idle tick
+  timerAlarmEnable(t);
+
+#elif defined(ESP8266)
+  // timer1: we will re-arm it each ISR (single shot)
   timer1_isr_init();
-  timer1_attachInterrupt(timer1_isr_handler);
-  timer1_disable();
+  timer1_attachInterrupt(&StepperISR::onTimer);
+  timer1_enable(TIM_DIV16, TIM_EDGE, TIM_SINGLE);
+  timer1_write(20000 * 5); // ~20ms idle tick (ticks ≈ us*5 at DIV16)
 #endif
 }
 
-void StepperISR::setSpeed(float stepsPerSec) {
-  _targetSps = stepsPerSec;
-  
-  float absSps = fabsf(stepsPerSec);
-  
-  if (absSps < 1.0f) {
-    // Stop
-    _enabled = false;
-#if defined(ESP32)
-    timerAlarmDisable(stepTimer);
+void StepperISR::stop() {
+  noInterrupts();
+  _intervalUs = 0;
+  interrupts();
+}
+
+void StepperISR::setSpeedSps(float sps) {
+  bool dir = (sps >= 0.0f);
+  float spsAbs = fabsf(sps);
+
+  uint32_t intervalUs = spsToIntervalUs(spsAbs);
+
+  // atomic-ish update
+  noInterrupts();
+  _dirFwd = dir;
+  _intervalUs = intervalUs;
+  interrupts();
+}
+
+#if defined(ESP8266)
+void ICACHE_RAM_ATTR StepperISR::onTimer() {
 #else
-    timer1_disable();
+void IRAM_ATTR StepperISR::onTimer() {
 #endif
-    digitalWrite(_stepPin, LOW);
+  StepperISR* s = self;
+  if (!s || !s->_enabled) return;
+
+  uint32_t intervalUs = s->_intervalUs;
+
+  if (intervalUs == 0) {
+    // stopped => keep slow tick
+#if defined(ESP32)
+    hw_timer_t* t = (hw_timer_t*)s->_timer;
+    timerAlarmWrite(t, 20000, true);
+#else
+    timer1_write(20000 * 5);
+#endif
     return;
   }
-  
-  // Set direction (HIGH = forward for most drivers)
-  bool newDir = (stepsPerSec >= 0);
-  if (newDir != _dirFwd) {
-    _dirFwd = newDir;
-    digitalWrite(_dirPin, _dirFwd ? HIGH : LOW);
-  }
-  
+
+  digitalWrite(s->_dirPin, s->_dirFwd ? HIGH : LOW);
+
+  // Pulse: HIGH then LOW immediately.
+  // digitalWrite latency usually gives enough pulse width for TMC2209.
+  digitalWrite(s->_stepPin, HIGH);
+  digitalWrite(s->_stepPin, LOW);
+
 #if defined(ESP32)
-  // ESP32: One timer call per step (pulse in ISR)
-  uint32_t intervalUs = (uint32_t)(1000000.0f / absSps);
-  if (intervalUs < 50) intervalUs = 50;
-  
-  timerAlarmWrite(stepTimer, intervalUs, true);
-  _enabled = true;
-  timerAlarmEnable(stepTimer);
+  hw_timer_t* t = (hw_timer_t*)s->_timer;
+  timerAlarmWrite(t, intervalUs, true);
 #else
-  // ESP8266: Two timer calls per step (toggle)
-  uint32_t intervalUs = (uint32_t)(1000000.0f / (absSps * 2.0f));
-  if (intervalUs < 25) intervalUs = 25;
-  
-  // Timer1 uses 5MHz clock (DIV16 from 80MHz)
-  // ticks = intervalUs * 5
-  uint32_t ticks = intervalUs * 5;
-  if (ticks > 8388607) ticks = 8388607;  // 23-bit max
-  
-  timer1_enable(TIM_DIV16, TIM_EDGE, TIM_LOOP);
-  timer1_write(ticks);
-  _enabled = true;
+  timer1_write(intervalUs * 5);
 #endif
 }
