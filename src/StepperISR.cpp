@@ -44,8 +44,12 @@ void StepperISR::begin(uint8_t stepPin, uint8_t dirPin) {
 
 void StepperISR::stop() {
   noInterrupts();
+  bool wasRunning = (_intervalUs > 0);
   _intervalUs = 0;
   interrupts();
+  if (wasRunning) {
+    Serial.println("ISR stop() called");
+  }
 }
 
 void StepperISR::setSpeedSps(float sps) {
@@ -53,12 +57,37 @@ void StepperISR::setSpeedSps(float sps) {
   float spsAbs = fabsf(sps);
 
   uint32_t intervalUs = spsToIntervalUs(spsAbs);
+  
+  // Debug
+  static uint32_t lastDbg = 0;
+  static uint32_t lastInterval = 0;
+  if (intervalUs != lastInterval || millis() - lastDbg > 1000) {
+    Serial.printf("ISR setSpeed: sps=%.1f interval=%u\n", sps, intervalUs);
+    lastDbg = millis();
+    lastInterval = intervalUs;
+  }
 
-  // atomic-ish update
   noInterrupts();
+  bool wasZero = (_intervalUs == 0);
   _dirFwd = dir;
   _intervalUs = intervalUs;
   interrupts();
+  
+  // Force immediate timer restart when transitioning from stopped to running
+  // MUST be outside noInterrupts block on ESP8266!
+  if (wasZero && intervalUs > 0) {
+#if defined(ESP32)
+    noInterrupts();
+    hw_timer_t* t = (hw_timer_t*)_timer;
+    timerAlarmWrite(t, intervalUs, true);
+    interrupts();
+#else
+    // Re-enable and re-arm timer
+    timer1_enable(TIM_DIV16, TIM_EDGE, TIM_SINGLE);
+    timer1_write(intervalUs * 5);
+#endif
+    Serial.println("ISR: forced timer restart");
+  }
 }
 
 #if defined(ESP8266)
@@ -68,7 +97,8 @@ void IRAM_ATTR StepperISR::onTimer() {
 #endif
   StepperISR* s = self;
   if (!s || !s->_enabled) return;
-
+  
+  s->isrCount++;
   uint32_t intervalUs = s->_intervalUs;
 
   if (intervalUs == 0) {
@@ -88,6 +118,8 @@ void IRAM_ATTR StepperISR::onTimer() {
   // digitalWrite latency usually gives enough pulse width for TMC2209.
   digitalWrite(s->_stepPin, HIGH);
   digitalWrite(s->_stepPin, LOW);
+  
+  s->pulseCount++;
 
 #if defined(ESP32)
   hw_timer_t* t = (hw_timer_t*)s->_timer;

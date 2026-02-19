@@ -24,10 +24,13 @@ private:
   uint8_t _stepPin = 0;
   uint8_t _dirPin  = 0;
 
+public:
   // Shared with ISR (keep it primitive)
   volatile uint32_t _intervalUs = 0; // 0 => stopped
   volatile bool     _dirFwd     = true;
   volatile bool     _enabled    = false;
+  volatile uint32_t pulseCount = 0;  // Debug: count pulses sent
+  volatile uint32_t isrCount = 0;    // Debug: count ISR fires
 
 #if defined(ESP32)
   void* _timer = nullptr; // hw_timer_t*

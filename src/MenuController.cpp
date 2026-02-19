@@ -123,6 +123,7 @@ void MenuController::handleMainScreen(const InputsSnapshot& s) {
   }
 
   if (s.okPressed) {
+    Serial.printf("OK pressed, screen=Main, paused=%d\n", _session->isPaused());
     _session->toggleRun();
   }
 
