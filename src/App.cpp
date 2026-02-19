@@ -1,6 +1,7 @@
 #include "App.h"
 #include "Config.h"
 #include "StepperISR.h"
+#include "Buzzer.h"
 #include <Wire.h>
 
 void App::begin() {
@@ -27,6 +28,11 @@ void App::begin() {
   
   _session.begin(&_motor);
   _menu.begin(&_session);
+  
+#if !defined(ESP32)
+  buzzer.begin(PIN_BUZZER);
+  buzzer.beep(1000, 50);  // short startup beep
+#endif
 }
 
 void App::tick() {
@@ -35,6 +41,7 @@ void App::tick() {
   _temp.tick();
   _session.setCurrentTemp(_temp.tempC());
   _session.tick();
+  buzzer.tick();
   
   updateUiModel(s);
   _ui.tick(_uiModel);

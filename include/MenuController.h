@@ -23,7 +23,10 @@ enum class Screen : uint8_t {
   // Temp limits submenu
   EditTempLimitsEnabled,
   EditTempMin,
-  EditTempMax
+  EditTempMax,
+  // Buzzer submenu
+  BuzzerMenu,
+  EditBuzzerEnabled
 };
 
 class MenuController {
@@ -57,7 +60,7 @@ private:
   Screen _screen = Screen::Main;
   int8_t _menuIdx = 0;
   int8_t _subMenuIdx = 0;
-  static constexpr int8_t MENU_ITEMS = 4;  // RPM, Steps, Reverse, TempCoef
+  static constexpr int8_t MENU_ITEMS = 5;  // RPM, Steps, Reverse, TempCoef, Buzzer
   
   // Temporary edit values
   int32_t _editRpm = 0;
@@ -96,4 +99,7 @@ private:
   bool handleEditTempLimitsEnabled(const InputsSnapshot& s);
   bool handleEditTempMin(const InputsSnapshot& s);
   bool handleEditTempMax(const InputsSnapshot& s);
+  // Buzzer
+  void handleBuzzerMenu(const InputsSnapshot& s);
+  bool handleEditBuzzerEnabled(const InputsSnapshot& s);
 };

@@ -33,11 +33,12 @@ constexpr uint16_t DISCOVERY_PORT = 45454;
   constexpr uint8_t PIN_ENC_A    = D7;   // encoder CLK
   constexpr uint8_t PIN_ENC_B    = D3;   // encoder DT
   constexpr uint8_t PIN_ENC_SW   = D6;   // encoder push button (was showing as OK)
-  constexpr uint8_t PIN_BTN_OK   = 3;    // GPIO3 (RX) - OK button (or unused)
+  constexpr uint8_t PIN_BTN_OK   = 255;  // not used (was GPIO3)
   constexpr uint8_t PIN_BTN_BACK = D0;   // BACK button (stop/menu/exit)
   constexpr uint8_t PIN_DS18B20 = D5;
   constexpr uint8_t PIN_SDA = D2;
   constexpr uint8_t PIN_SCL = D1;
+  constexpr uint8_t PIN_BUZZER = 3;  // GPIO3 (RX) - piezo buzzer
 #endif
 
 // Motor parameters (NEMA17 + TMC2209)

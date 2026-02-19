@@ -2,6 +2,7 @@
 #include "Config.h"
 #include "MenuController.h"
 #include "SessionController.h"
+#include "Buzzer.h"
 #include <cstdio>
 
 void Ui::begin() {
@@ -38,6 +39,9 @@ void Ui::draw(const UiModel& m) {
     case Screen::EditTempLimitsEnabled: drawEditTempLimitsEnabled(m); break;
     case Screen::EditTempMin: drawEditTempMin(m); break;
     case Screen::EditTempMax: drawEditTempMax(m); break;
+    // Buzzer
+    case Screen::BuzzerMenu: drawBuzzerMenu(m); break;
+    case Screen::EditBuzzerEnabled: drawEditBuzzerEnabled(m); break;
   }
 
   _u8g2.sendBuffer();
@@ -111,17 +115,22 @@ void Ui::drawMain(const UiModel& m) {
 
 void Ui::drawMenu(const UiModel& m) {
   const int x = 2;
-  const int TOTAL = 4;  // RPM, Steps>, Reverse>, TempCoef>
+  const int TOTAL = 5;  // RPM, Steps>, Reverse>, TempCoef>, Buzzer>
+  const int VISIBLE = 4;
   
   _u8g2.setFont(u8g2_font_6x13_tf);
   _u8g2.drawStr(x, 12, "SETTINGS");
   _u8g2.drawHLine(x, 14, 124);
 
-  const char* items[] = {"RPM", "Steps", "Reverse", "TempCoef"};
+  const char* items[] = {"RPM", "Steps", "Reverse", "TempCoef", "Buzzer"};
   char buf[32];
   
-  for (int i = 0; i < TOTAL; i++) {
-    int y = 26 + i * 10;
+  int scrollOff = 0;
+  if (m.menuIdx >= VISIBLE) scrollOff = m.menuIdx - VISIBLE + 1;
+  
+  for (int v = 0; v < VISIBLE && (v + scrollOff) < TOTAL; v++) {
+    int i = v + scrollOff;
+    int y = 26 + v * 10;
     bool sel = (i == m.menuIdx);
     
     if (sel) {
@@ -134,12 +143,17 @@ void Ui::drawMenu(const UiModel& m) {
       case 1: snprintf(buf, sizeof(buf), "%s (%d) >", items[i], m.stepCount); break;
       case 2: snprintf(buf, sizeof(buf), "%s >", items[i]); break;
       case 3: snprintf(buf, sizeof(buf), "%s >", items[i]); break;
+      case 4: snprintf(buf, sizeof(buf), "%s: %s >", items[i], buzzer.enabled ? "ON" : "OFF"); break;
     }
     _u8g2.drawStr(x, y, buf);
     _u8g2.setDrawColor(1);
   }
-
+  
+  // Scroll indicators
   _u8g2.setFont(u8g2_font_5x8_tf);
+  if (scrollOff > 0) _u8g2.drawStr(120, 20, "^");
+  if (scrollOff + VISIBLE < TOTAL) _u8g2.drawStr(120, 54, "v");
+
   _u8g2.drawStr(x, 63, "ENC:sel  OK:edit  BACK:exit");
 }
 
@@ -447,4 +461,47 @@ void Ui::drawEditTempMax(const UiModel& m) {
 
   _u8g2.setFont(u8g2_font_5x8_tf);
   _u8g2.drawStr(x, 63, "ENC:+/-0.5  OK:save  BACK:cancel");
+}
+
+// ===== Buzzer Submenu =====
+void Ui::drawBuzzerMenu(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  _u8g2.drawStr(x, 12, "BUZZER");
+  _u8g2.drawHLine(x, 14, 124);
+
+  char buf[32];
+  
+  for (int i = 0; i < 2; i++) {
+    int y = 30 + i * 14;
+    bool sel = (i == m.subMenuIdx);
+    if (sel) {
+      _u8g2.drawBox(0, y - 10, 128, 13);
+      _u8g2.setDrawColor(0);
+    }
+    if (i == 0) {
+      snprintf(buf, sizeof(buf), "Enabled: %s", buzzer.enabled ? "ON" : "OFF");
+    } else {
+      snprintf(buf, sizeof(buf), "Test Beep");
+    }
+    _u8g2.drawStr(x, y, buf);
+    _u8g2.setDrawColor(1);
+  }
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  _u8g2.drawStr(x, 63, "OK:edit/test  BACK:menu");
+}
+
+void Ui::drawEditBuzzerEnabled(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  _u8g2.drawStr(x, 12, "BUZZER ENABLED");
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_fur30_tf);
+  const char* val = buzzer.enabled ? "ON" : "OFF";
+  int w = _u8g2.getStrWidth(val);
+  _u8g2.drawStr((128 - w) / 2, 48, val);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  _u8g2.drawStr(x, 63, "ENC:toggle  OK:save  BACK:cancel");
 }

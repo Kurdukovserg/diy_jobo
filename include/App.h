@@ -7,6 +7,7 @@
 #include "MotorController.h"
 #include "SessionController.h"
 #include "MenuController.h"
+#include "Buzzer.h"
 
 class App {
 public:

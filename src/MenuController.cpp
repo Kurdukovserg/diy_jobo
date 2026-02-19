@@ -1,4 +1,5 @@
 #include "MenuController.h"
+#include "Buzzer.h"
 
 void MenuController::begin(SessionController* session) {
   _session = session;
@@ -60,6 +61,13 @@ bool MenuController::handleInput(const InputsSnapshot& s) {
     case Screen::EditTempMax:
       settingsChanged = handleEditTempMax(s);
       break;
+    // Buzzer submenu
+    case Screen::BuzzerMenu:
+      handleBuzzerMenu(s);
+      break;
+    case Screen::EditBuzzerEnabled:
+      settingsChanged = handleEditBuzzerEnabled(s);
+      break;
   }
   
   return settingsChanged;
@@ -113,6 +121,9 @@ void MenuController::handleMenuScreen(const InputsSnapshot& s) {
         break;
       case 3: 
         _screen = Screen::TempCoefMenu; 
+        break;
+      case 4:
+        _screen = Screen::BuzzerMenu;
         break;
     }
   }
@@ -465,6 +476,51 @@ bool MenuController::handleEditTempMax(const InputsSnapshot& s) {
   }
   if (s.backPressed || s.a0BackPressed) {
     _screen = Screen::TempCoefMenu;
+  }
+  
+  return changed;
+}
+
+// ===== Buzzer Submenu =====
+void MenuController::handleBuzzerMenu(const InputsSnapshot& s) {
+  const int8_t ITEMS = 2;  // Enabled, Test
+  
+  if (s.encDelta != 0) {
+    _subMenuIdx += s.encDelta;
+    if (_subMenuIdx < 0) _subMenuIdx = ITEMS - 1;
+    if (_subMenuIdx >= ITEMS) _subMenuIdx = 0;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    switch (_subMenuIdx) {
+      case 0:
+        _screen = Screen::EditBuzzerEnabled;
+        break;
+      case 1:
+        // Test beep
+        buzzer.beep(1000, 200);
+        break;
+    }
+  }
+
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::Menu;
+  }
+}
+
+bool MenuController::handleEditBuzzerEnabled(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    buzzer.enabled = !buzzer.enabled;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    _screen = Screen::BuzzerMenu;
+    changed = true;
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::BuzzerMenu;
   }
   
   return changed;

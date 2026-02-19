@@ -98,4 +98,7 @@ private:
   void drawEditTempLimitsEnabled(const UiModel& m);
   void drawEditTempMin(const UiModel& m);
   void drawEditTempMax(const UiModel& m);
+  // Buzzer
+  void drawBuzzerMenu(const UiModel& m);
+  void drawEditBuzzerEnabled(const UiModel& m);
 };
