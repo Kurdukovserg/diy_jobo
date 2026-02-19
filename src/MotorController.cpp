@@ -20,6 +20,7 @@ void MotorController::setRun(bool run) {
     _lastReverseMs = millis(); // Reset reverse timer
     _dirFwd = true;          // Start in forward direction
     _rs = RS_RUN;            // Normal running state
+    stepperISR.kickStart();  // Force timer to wake up quickly
     Serial.println("Motor: reset state for fresh start");
   }
   
@@ -126,19 +127,41 @@ void MotorController::tick() {
     }
   }
   
-  // Debug ramp progress
+  // Debug ramp progress + ISR watchdog
   static uint32_t lastDebugMs = 0;
   static uint32_t lastPulseCount = 0;
   static uint32_t lastIsrCount = 0;
-  if (millis() - lastDebugMs > 500) {
+  static uint32_t lastWatchdogIsrCount = 0;
+  static uint32_t lastWatchdogMs = 0;
+  
+  uint32_t currentIsrs = stepperISR.isrCount;
+  
+  // Watchdog: if ISR hasn't fired in 200ms while we expect it to, kick it
+  if (nowMs - lastWatchdogMs > 200) {
+    if (stepperISR._intervalUs > 0 && stepperISR._intervalUs < 50000) {
+      // We expect ISR to be firing rapidly
+      if (currentIsrs == lastWatchdogIsrCount) {
+        // ISR stalled! Kick it (only log once per second max)
+        static uint32_t lastWatchdogLog = 0;
+        if (nowMs - lastWatchdogLog > 1000) {
+          Serial.println("ISR watchdog: stall detected, kicking");
+          lastWatchdogLog = nowMs;
+        }
+        stepperISR.kickStart();
+      }
+    }
+    lastWatchdogIsrCount = currentIsrs;
+    lastWatchdogMs = nowMs;
+  }
+  
+  if (nowMs - lastDebugMs > 500) {
     uint32_t pulses = stepperISR.pulseCount;
-    uint32_t isrs = stepperISR.isrCount;
     Serial.printf("tick: rpm=%.1f isr=%u pulse=%u interval=%u\n", 
-                  _currentRpm, isrs - lastIsrCount, pulses - lastPulseCount,
+                  _currentRpm, currentIsrs - lastIsrCount, pulses - lastPulseCount,
                   stepperISR._intervalUs);
     lastPulseCount = pulses;
-    lastIsrCount = isrs;
-    lastDebugMs = millis();
+    lastIsrCount = currentIsrs;
+    lastDebugMs = nowMs;
   }
 
   // Always call setSpeedSps when running - even with small RPM

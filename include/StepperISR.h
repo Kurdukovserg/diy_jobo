@@ -10,6 +10,9 @@ public:
 
   // immediate stop (interval=0)
   void stop();
+  
+  // Force timer to fire soon (call after stop->start transition)
+  void kickStart();
 
   // ISR handler
 #if defined(ESP8266)

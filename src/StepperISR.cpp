@@ -46,10 +46,35 @@ void StepperISR::stop() {
   noInterrupts();
   bool wasRunning = (_intervalUs > 0);
   _intervalUs = 0;
+#if defined(ESP32)
+  hw_timer_t* t = (hw_timer_t*)_timer;
+  if (t) {
+    timerAlarmDisable(t);  // Completely stop timer interrupts
+  }
+#elif defined(ESP8266)
+  // ESP8266: just set slow tick, don't disable (causes WDT reset)
+  timer1_write(100000 * 5);  // 100ms slow tick
+#endif
   interrupts();
   if (wasRunning) {
     Serial.println("ISR stop() called");
   }
+}
+
+void StepperISR::kickStart() {
+  // Reinitialize timer to fire soon
+#if defined(ESP32)
+  hw_timer_t* t = (hw_timer_t*)_timer;
+  if (t) {
+    timerAlarmDisable(t);           // Stop first
+    timerWrite(t, 0);               // Reset counter to 0
+    timerAlarmWrite(t, 100, true);  // Set alarm at 100µs
+    timerAlarmEnable(t);            // Start
+  }
+#elif defined(ESP8266)
+  // Just set timer to fire soon (don't disable/re-enable)
+  timer1_write(500);  // Fire in ~100µs at DIV16
+#endif
 }
 
 void StepperISR::setSpeedSps(float sps) {
@@ -68,25 +93,14 @@ void StepperISR::setSpeedSps(float sps) {
   }
 
   noInterrupts();
-  bool wasZero = (_intervalUs == 0);
+  uint32_t oldInterval = _intervalUs;
   _dirFwd = dir;
   _intervalUs = intervalUs;
   interrupts();
   
-  // Force immediate timer restart when transitioning from stopped to running
-  // MUST be outside noInterrupts block on ESP8266!
-  if (wasZero && intervalUs > 0) {
-#if defined(ESP32)
-    noInterrupts();
-    hw_timer_t* t = (hw_timer_t*)_timer;
-    timerAlarmWrite(t, intervalUs, true);
-    interrupts();
-#else
-    // Re-enable and re-arm timer
-    timer1_enable(TIM_DIV16, TIM_EDGE, TIM_SINGLE);
-    timer1_write(intervalUs * 5);
-#endif
-    Serial.println("ISR: forced timer restart");
+  // If switching from stopped to running, restart the timer
+  if (intervalUs > 0 && oldInterval == 0) {
+    kickStart();
   }
 }
 
@@ -102,12 +116,9 @@ void IRAM_ATTR StepperISR::onTimer() {
   uint32_t intervalUs = s->_intervalUs;
 
   if (intervalUs == 0) {
-    // stopped => keep slow tick
-#if defined(ESP32)
-    hw_timer_t* t = (hw_timer_t*)s->_timer;
-    timerAlarmWrite(t, 20000, true);
-#else
-    timer1_write(20000 * 5);
+    // stopped => keep slow tick running
+#if defined(ESP8266)
+    timer1_write(100000 * 5);  // 100ms slow tick
 #endif
     return;
   }
