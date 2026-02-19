@@ -34,7 +34,6 @@ private:
   static constexpr uint32_t ENC_DEBOUNCE_US = 1200;
 
   // gpio buttons last state
-  bool _lastOk = HIGH;
   bool _lastBack = HIGH;
   bool _lastEncSw = HIGH;
   

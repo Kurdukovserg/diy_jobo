@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include "Inputs.h"
 #include "SessionController.h"
+#include "HardwareSettings.h"
 
 enum class Screen : uint8_t {
   Main,
@@ -23,7 +24,24 @@ enum class Screen : uint8_t {
   // Temp limits submenu
   EditTempLimitsEnabled,
   EditTempMin,
-  EditTempMax
+  EditTempMax,
+  // Buzzer submenu
+  BuzzerMenu,
+  EditBuzzerEnabled,
+  EditBuzzerStepFinished,
+  EditBuzzerProcessEnded,
+  EditBuzzerTempWarning,
+  EditBuzzerFreq,
+  BuzzerTest,
+  // Hardware submenu
+  HardwareMenu,
+  EditStepsPerRev,
+  EditMicrosteps,
+  EditDriverType,
+  EditMotorInvert,
+  EditBuzzerType,
+  EditBuzzerActiveHigh,
+  EditTempOffset
 };
 
 class MenuController {
@@ -50,6 +68,28 @@ public:
   bool editTempLimitsEnabled() const { return _editTempLimitsEnabled; }
   float editTempMin() const { return _editTempMin; }
   float editTempMax() const { return _editTempMax; }
+  // Buzzer
+  bool editBuzzerEnabled() const { return _editBuzzerEnabled; }
+  bool editBuzzerStepFinished() const { return _editBuzzerStepFinished; }
+  bool editBuzzerProcessEnded() const { return _editBuzzerProcessEnded; }
+  bool editBuzzerTempWarning() const { return _editBuzzerTempWarning; }
+  uint16_t editBuzzerFreq() const { return _editBuzzerFreq; }
+  // Hardware
+  uint16_t editStepsPerRev() const { return _editStepsPerRev; }
+  uint8_t editMicrosteps() const { return _editMicrosteps; }
+  DriverType editDriverType() const { return _editDriverType; }
+  bool editMotorInvert() const { return _editMotorInvert; }
+  BuzzerType editBuzzerType() const { return _editBuzzerType; }
+  bool editBuzzerActiveHigh() const { return _editBuzzerActiveHigh; }
+  float editTempOffset() const { return _editTempOffset; }
+  
+  // Hardware settings storage (owned by MenuController for now)
+  HardwareSettings& hwSettings() { return _hwSettings; }
+  const HardwareSettings& hwSettings() const { return _hwSettings; }
+  
+  // Callback for buzzer test (set by App)
+  void setBuzzerTestCallback(void (*cb)()) { _buzzerTestCb = cb; }
+  void setHardwareChangedCallback(void (*cb)()) { _hwChangedCb = cb; }
 
 private:
   SessionController* _session = nullptr;
@@ -57,7 +97,7 @@ private:
   Screen _screen = Screen::Main;
   int8_t _menuIdx = 0;
   int8_t _subMenuIdx = 0;
-  static constexpr int8_t MENU_ITEMS = 4;  // RPM, Steps, Reverse, TempCoef
+  static constexpr int8_t MENU_ITEMS = 6;  // RPM, Steps, Reverse, TempCoef, Buzzer, Hardware
   
   // Temporary edit values
   int32_t _editRpm = 0;
@@ -72,6 +112,21 @@ private:
   bool _editTempLimitsEnabled = false;
   float _editTempMin = 18.0f;
   float _editTempMax = 24.0f;
+  // Buzzer
+  bool _editBuzzerEnabled = true;
+  bool _editBuzzerStepFinished = true;
+  bool _editBuzzerProcessEnded = true;
+  bool _editBuzzerTempWarning = true;
+  uint16_t _editBuzzerFreq = 2200;
+  // Hardware
+  HardwareSettings _hwSettings;
+  uint16_t _editStepsPerRev = 200;
+  uint8_t _editMicrosteps = 16;
+  DriverType _editDriverType = DriverType::TMC2209;
+  bool _editMotorInvert = false;
+  BuzzerType _editBuzzerType = BuzzerType::Passive;
+  bool _editBuzzerActiveHigh = true;
+  float _editTempOffset = 0.0f;
 
   static constexpr int RPM_MIN = 1;
   static constexpr int RPM_MAX = 80;
@@ -96,4 +151,24 @@ private:
   bool handleEditTempLimitsEnabled(const InputsSnapshot& s);
   bool handleEditTempMin(const InputsSnapshot& s);
   bool handleEditTempMax(const InputsSnapshot& s);
+  // Buzzer
+  void handleBuzzerMenu(const InputsSnapshot& s);
+  bool handleEditBuzzerEnabled(const InputsSnapshot& s);
+  bool handleEditBuzzerStepFinished(const InputsSnapshot& s);
+  bool handleEditBuzzerProcessEnded(const InputsSnapshot& s);
+  bool handleEditBuzzerTempWarning(const InputsSnapshot& s);
+  bool handleEditBuzzerFreq(const InputsSnapshot& s);
+  void handleBuzzerTest(const InputsSnapshot& s);
+  // Hardware
+  void handleHardwareMenu(const InputsSnapshot& s);
+  bool handleEditStepsPerRev(const InputsSnapshot& s);
+  bool handleEditMicrosteps(const InputsSnapshot& s);
+  bool handleEditDriverType(const InputsSnapshot& s);
+  bool handleEditMotorInvert(const InputsSnapshot& s);
+  bool handleEditBuzzerType(const InputsSnapshot& s);
+  bool handleEditBuzzerActiveHigh(const InputsSnapshot& s);
+  bool handleEditTempOffset(const InputsSnapshot& s);
+  
+  void (*_buzzerTestCb)() = nullptr;
+  void (*_hwChangedCb)() = nullptr;
 };

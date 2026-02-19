@@ -49,6 +49,22 @@ struct UiModel {
   bool tempLow = false;
   bool tempHigh = false;
 
+  // Buzzer settings
+  bool buzzerEnabled = true;
+  bool buzzerStepFinished = true;
+  bool buzzerProcessEnded = true;
+  bool buzzerTempWarning = true;
+  uint16_t buzzerFreq = 2200;
+
+  // Hardware settings
+  uint16_t stepsPerRev = 200;
+  uint8_t microsteps = 16;
+  uint8_t driverType = 1;      // 0=Generic, 1=TMC2209
+  bool motorInvert = false;
+  uint8_t buzzerType = 1;      // 0=Active, 1=Passive
+  bool buzzerActiveHigh = true;
+  float tempOffset = 0.0f;
+
   bool hasTemp = false;
   float tempC = NAN;
 
@@ -98,4 +114,21 @@ private:
   void drawEditTempLimitsEnabled(const UiModel& m);
   void drawEditTempMin(const UiModel& m);
   void drawEditTempMax(const UiModel& m);
+  // Buzzer
+  void drawBuzzerMenu(const UiModel& m);
+  void drawEditBuzzerEnabled(const UiModel& m);
+  void drawEditBuzzerStepFinished(const UiModel& m);
+  void drawEditBuzzerProcessEnded(const UiModel& m);
+  void drawEditBuzzerTempWarning(const UiModel& m);
+  void drawEditBuzzerFreq(const UiModel& m);
+  void drawBuzzerTest(const UiModel& m);
+  // Hardware
+  void drawHardwareMenu(const UiModel& m);
+  void drawEditStepsPerRev(const UiModel& m);
+  void drawEditMicrosteps(const UiModel& m);
+  void drawEditDriverType(const UiModel& m);
+  void drawEditMotorInvert(const UiModel& m);
+  void drawEditBuzzerType(const UiModel& m);
+  void drawEditBuzzerActiveHigh(const UiModel& m);
+  void drawEditTempOffset(const UiModel& m);
 };

@@ -4,9 +4,10 @@
 App app;
 
 void setup() {
-  // якщо Serial заважає — не чіпаємо
+  Serial.begin(115200);
   delay(50);
   app.begin();
+  Serial.println("Setup complete");
 }
 
 void loop() {

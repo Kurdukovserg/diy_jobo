@@ -1,0 +1,155 @@
+#pragma once
+#include <Arduino.h>
+
+enum class AlertType : uint8_t {
+  None = 0,
+  StepFinished,   // One short beep
+  ProcessEnded,   // Three long beeps
+  TempWarning     // Fast intermittent beeping (repeating)
+};
+
+struct BuzzerSettings {
+  bool enabled = true;           // Master enable
+  bool onStepFinished = true;    // Beep when step ends
+  bool onProcessEnded = true;    // Beep when process ends
+  bool onTempWarning = true;     // Beep on temp alarm
+  uint16_t freqHz = 2200;        // Tone frequency (800-4000)
+};
+
+class Buzzer {
+public:
+  struct Config {
+    uint8_t pin = 255;
+    bool activeHigh = true;
+    uint16_t freqHz = 2200;     // for passive buzzer
+    uint16_t shortMs = 50;      // short beep duration
+    uint16_t longMs = 300;      // long beep duration
+    uint16_t gapMs = 100;       // gap between beeps
+    uint16_t fastMs = 80;       // fast beep for warning
+    uint16_t fastGapMs = 80;    // fast gap for warning
+  };
+
+  void begin(const Config& cfg) {
+    _cfg = cfg;
+    if (_cfg.pin == 255) return;
+    pinMode(_cfg.pin, OUTPUT);
+    off();
+  }
+
+  void setSettings(const BuzzerSettings& s) {
+    _settings = s;
+    _cfg.freqHz = s.freqHz;
+  }
+  
+  BuzzerSettings& settings() { return _settings; }
+  const BuzzerSettings& settings() const { return _settings; }
+
+  void alert(AlertType type) {
+    if (_cfg.pin == 255 || !_settings.enabled) return;
+    
+    // Check if this event type is enabled
+    if (type == AlertType::StepFinished && !_settings.onStepFinished) return;
+    if (type == AlertType::ProcessEnded && !_settings.onProcessEnded) return;
+    if (type == AlertType::TempWarning && !_settings.onTempWarning) return;
+    
+    _alertType = type;
+    _alertStep = 0;
+    _nextActionMs = millis();
+  }
+  
+  void stopAlert() {
+    _alertType = AlertType::None;
+    off();
+  }
+  
+  void testBeep() {
+    if (_cfg.pin == 255) return;
+    Serial.println("testBeep() called");
+    // Immediately start tone for instant feedback
+    on();
+    _alertType = AlertType::StepFinished;
+    _alertStep = 1;  // Already on, next tick will turn off
+    _nextActionMs = millis() + _cfg.shortMs;
+  }
+
+  void tick() {
+    if (_alertType == AlertType::None) return;
+    
+    uint32_t now = millis();
+    if ((int32_t)(now - _nextActionMs) < 0) return;
+    
+    switch (_alertType) {
+      case AlertType::StepFinished:
+        // One short beep then done
+        if (_alertStep == 0) {
+          on();
+          _nextActionMs = now + _cfg.shortMs;
+          _alertStep = 1;
+        } else {
+          off();
+          _alertType = AlertType::None;
+        }
+        break;
+        
+      case AlertType::ProcessEnded:
+        // Three long beeps: on-off-on-off-on-off
+        if (_alertStep < 6) {
+          if (_alertStep % 2 == 0) {
+            on();
+            _nextActionMs = now + _cfg.longMs;
+          } else {
+            off();
+            _nextActionMs = now + _cfg.gapMs;
+          }
+          _alertStep++;
+        } else {
+          off();
+          _alertType = AlertType::None;
+        }
+        break;
+        
+      case AlertType::TempWarning:
+        // Fast repeating beeps (continues until stopAlert)
+        if (_alertStep % 2 == 0) {
+          on();
+          _nextActionMs = now + _cfg.fastMs;
+        } else {
+          off();
+          _nextActionMs = now + _cfg.fastGapMs;
+        }
+        _alertStep++;
+        break;
+        
+      default:
+        _alertType = AlertType::None;
+        break;
+    }
+  }
+  
+  bool isAlerting() const { return _alertType != AlertType::None; }
+  AlertType currentAlert() const { return _alertType; }
+
+private:
+  void on() {
+#if defined(ESP32)
+    digitalWrite(_cfg.pin, _cfg.activeHigh ? HIGH : LOW);
+#else
+    tone(_cfg.pin, _cfg.freqHz);
+#endif
+  }
+
+  void off() {
+#if defined(ESP32)
+    digitalWrite(_cfg.pin, _cfg.activeHigh ? LOW : HIGH);
+#else
+    noTone(_cfg.pin);
+    digitalWrite(_cfg.pin, _cfg.activeHigh ? LOW : HIGH);
+#endif
+  }
+
+  Config _cfg;
+  BuzzerSettings _settings;
+  AlertType _alertType = AlertType::None;
+  uint8_t _alertStep = 0;
+  uint32_t _nextActionMs = 0;
+};
