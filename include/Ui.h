@@ -33,13 +33,28 @@ struct UiModel {
   
   // For edit screen
   int8_t editStepIdx = 0;
+  int8_t editStepDetailIdx = 0;
   int32_t editStepDuration = 0;
+  int32_t editStepRpm = 30;
+  uint8_t editStepTempMode = 0;  // StepTempMode as uint8_t
+  float editStepTempTarget = 20.0f;
+  uint8_t editStepTempBiasMode = 0;  // StepTempBiasMode as uint8_t
+  float editStepTempBias = 2.0f;
+  char editStepName[12] = "";
+  int8_t editNameCursor = 0;
+  bool editStepTempCoefOverride = false;
+  
+  // Current step info for main screen
+  char currentStepName[12] = "";
+  char profileName[16] = "";
+  int32_t currentStepRpm = 30;
 
   // Temperature coefficient
   bool tempCoefEnabled = false;
   float tempCoefBase = 20.0f;
   float tempCoefPercent = 10.0f;
   TempCoefTarget tempCoefTarget;
+  uint8_t tempAlarmAction = 1;  // TempAlarmAction as uint8_t
   
   // Temperature limits
   bool tempLimitsEnabled = false;
@@ -97,9 +112,21 @@ private:
   void drawMain(const UiModel& m);
   void drawMenu(const UiModel& m);
   void drawEditRpm(const UiModel& m);
-  // Steps
+  // Profile
+  void drawProfileMenu(const UiModel& m);
+  void drawProfileEditMenu(const UiModel& m);
+  void drawProfileSettingsMenu(const UiModel& m);
   void drawStepsMenu(const UiModel& m);
+  void drawStepDetailMenu(const UiModel& m);
   void drawEditStepDuration(const UiModel& m);
+  void drawEditStepRpm(const UiModel& m);
+  void drawEditStepTempMode(const UiModel& m);
+  void drawEditStepTempTarget(const UiModel& m);
+  void drawEditStepTempBiasMode(const UiModel& m);
+  void drawEditStepTempBias(const UiModel& m);
+  void drawEditStepName(const UiModel& m);
+  void drawEditStepTempCoefOverride(const UiModel& m);
+  void drawEditTempAlarmAction(const UiModel& m);
   // Reverse
   void drawReverseMenu(const UiModel& m);
   void drawEditReverseEnabled(const UiModel& m);

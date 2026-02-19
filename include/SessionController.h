@@ -8,15 +8,52 @@ enum class TempCoefTarget : uint8_t {
   Both = 2
 };
 
+// Action when temperature limit is hit
+enum class TempAlarmAction : uint8_t {
+  None = 0,     // no action, just display
+  Beep = 1,     // beep warning
+  Pause = 2,    // pause process
+  Stop = 3      // stop process completely
+};
+
 static constexpr int8_t MAX_STEPS = 10;
 
+static constexpr int8_t STEP_NAME_LEN = 12;  // max chars for step name
+static constexpr int8_t PROFILE_NAME_LEN = 16;  // max chars for profile name
+
+// Temperature mode for per-step temp control
+enum class StepTempMode : uint8_t {
+  Off = 0,      // no temp control for this step
+  Target = 1    // target temperature (display only, no control yet)
+};
+
+// Temperature bias/limit mode for per-step
+enum class StepTempBiasMode : uint8_t {
+  Off = 0,      // no bias/limit
+  Bias = 1      // +/- bias from target
+};
+
 struct ProcessStep {
-  int32_t durationSec = 0;  // 0 = disabled/unused
-  // Future: could add step name, RPM override, etc.
+  int32_t durationSec = 0;        // 0 = disabled/unused
+  int32_t rpm = 30;               // RPM for this step
+  StepTempMode tempMode = StepTempMode::Off;
+  float tempTarget = 20.0f;       // target temp if tempMode == Target
+  StepTempBiasMode tempBiasMode = StepTempBiasMode::Off;
+  float tempBias = 2.0f;          // +/- bias tolerance
+  char name[STEP_NAME_LEN] = ""; // step name (empty = "Step N")
+  
+  // Per-step temp coefficient override (UseProfile = use profile settings)
+  bool tempCoefOverride = false;  // if true, use step-specific settings below
+  bool tempCoefEnabled = false;
+  float tempCoefBase = 20.0f;
+  float tempCoefPercent = 10.0f;
+  TempCoefTarget tempCoefTarget = TempCoefTarget::Timer;
+  TempAlarmAction tempAlarmAction = TempAlarmAction::Beep;
 };
 
 struct SessionSettings {
-  int32_t targetRpm = 30;
+  int32_t targetRpm = 30;  // global RPM (used when no step-specific RPM)
+  char profileName[PROFILE_NAME_LEN] = "";  // profile name (empty = no profile)
   
   // Reverse
   bool reverseEnabled = true;
@@ -26,13 +63,14 @@ struct SessionSettings {
   ProcessStep steps[MAX_STEPS];
   int8_t stepCount = 1;  // number of active steps (1-10)
   
-  // Temperature coefficient
+  // Profile-level temperature coefficient (defaults for all steps)
   bool tempCoefEnabled = false;
   float tempCoefBase = 20.0f;
   float tempCoefPercent = 10.0f;
   TempCoefTarget tempCoefTarget = TempCoefTarget::Timer;
+  TempAlarmAction tempAlarmAction = TempAlarmAction::Beep;
   
-  // Temperature limits (alarm if outside range)
+  // Temperature limits (alarm if outside range) - profile level
   bool tempLimitsEnabled = false;
   float tempMin = 18.0f;
   float tempMax = 24.0f;
@@ -110,6 +148,7 @@ private:
 
   void checkTempLimits();
   float calcTempCoefMultiplier() const;
+  float calcTempCoefMultiplierForStep(int8_t stepIdx) const;
   void updateTimer();
   void resetTimer();
 };

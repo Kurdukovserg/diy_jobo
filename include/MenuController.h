@@ -7,24 +7,40 @@
 enum class Screen : uint8_t {
   Main,
   Menu,
-  EditRpm,
-  // Steps submenu (development profile)
-  StepsMenu,
+  // Profile submenu (development profile)
+  ProfileMenu,         // Profile selection (Custom for now, future: Default, Profile1, etc.)
+  ProfileEditMenu,     // Settings/Steps for selected profile
+  ProfileSettingsMenu, // Profile-level settings (TempCoef, TempLimits, etc.)
+  StepsMenu,           // List of steps
+  StepDetailMenu,      // sub-menu for single step
   EditStepDuration,
-  // Reverse submenu
-  ReverseMenu,
-  EditReverseEnabled,
-  EditReverseInterval,
-  // TempCoef submenu
-  TempCoefMenu,
+  EditStepRpm,
+  EditStepTempMode,
+  EditStepTempTarget,
+  EditStepTempBiasMode,
+  EditStepTempBias,
+  EditStepName,
+  // Step-level temp coef override
+  EditStepTempCoefOverride,
+  EditStepTempCoefEnabled,
+  EditStepTempCoefBase,
+  EditStepTempCoefPercent,
+  EditStepTempCoefTarget,
+  EditStepTempAlarmAction,
+  // Profile-level TempCoef (inside ProfileSettingsMenu)
   EditTempCoefEnabled,
   EditTempCoefBase,
   EditTempCoefPercent,
   EditTempCoefTarget,
-  // Temp limits submenu
+  EditTempAlarmAction,
+  // Temp limits (inside ProfileSettingsMenu)
   EditTempLimitsEnabled,
   EditTempMin,
   EditTempMax,
+  // Reverse submenu
+  ReverseMenu,
+  EditReverseEnabled,
+  EditReverseInterval,
   // Buzzer submenu
   BuzzerMenu,
   EditBuzzerEnabled,
@@ -56,15 +72,23 @@ public:
   int8_t subMenuIdx() const { return _subMenuIdx; }
   
   // Edit values for UI display
-  int32_t editRpm() const { return _editRpm; }
   int32_t editStepDuration() const { return _editStepDuration; }
   int8_t editStepIdx() const { return _editStepIdx; }
+  int32_t editStepRpm() const { return _editStepRpm; }
+  StepTempMode editStepTempMode() const { return _editStepTempMode; }
+  float editStepTempTarget() const { return _editStepTempTarget; }
+  StepTempBiasMode editStepTempBiasMode() const { return _editStepTempBiasMode; }
+  float editStepTempBias() const { return _editStepTempBias; }
+  const char* editStepName() const { return _editStepName; }
+  int8_t editStepDetailIdx() const { return _editStepDetailIdx; }
   bool editReverseEnabled() const { return _editReverseEnabled; }
   float editReverseInterval() const { return _editReverseInterval; }
   bool editTempCoefEnabled() const { return _editTempCoefEnabled; }
   float editTempCoefBase() const { return _editTempCoefBase; }
   float editTempCoefPercent() const { return _editTempCoefPercent; }
   TempCoefTarget editTempCoefTarget() const { return _editTempCoefTarget; }
+  TempAlarmAction editTempAlarmAction() const { return _editTempAlarmAction; }
+  bool editStepTempCoefOverride() const { return _editStepTempCoefOverride; }
   bool editTempLimitsEnabled() const { return _editTempLimitsEnabled; }
   float editTempMin() const { return _editTempMin; }
   float editTempMax() const { return _editTempMax; }
@@ -97,18 +121,27 @@ private:
   Screen _screen = Screen::Main;
   int8_t _menuIdx = 0;
   int8_t _subMenuIdx = 0;
-  static constexpr int8_t MENU_ITEMS = 6;  // RPM, Steps, Reverse, TempCoef, Buzzer, Hardware
+  static constexpr int8_t MENU_ITEMS = 4;  // Profile, Reverse, Buzzer, Hardware
   
   // Temporary edit values
-  int32_t _editRpm = 0;
   int32_t _editStepDuration = 0;
   int8_t _editStepIdx = 0;  // which step is being edited
+  int8_t _editStepDetailIdx = 0;  // which item in step detail menu
+  int32_t _editStepRpm = 30;
+  StepTempMode _editStepTempMode = StepTempMode::Off;
+  float _editStepTempTarget = 20.0f;
+  StepTempBiasMode _editStepTempBiasMode = StepTempBiasMode::Off;
+  float _editStepTempBias = 2.0f;
+  char _editStepName[STEP_NAME_LEN] = "";
+  int8_t _editNameCursor = 0;  // cursor position for name editing
   bool _editReverseEnabled = false;
   float _editReverseInterval = 0.0f;
   bool _editTempCoefEnabled = false;
   float _editTempCoefBase = 20.0f;
   float _editTempCoefPercent = 10.0f;
   TempCoefTarget _editTempCoefTarget = TempCoefTarget::Timer;
+  TempAlarmAction _editTempAlarmAction = TempAlarmAction::Beep;
+  bool _editStepTempCoefOverride = false;
   bool _editTempLimitsEnabled = false;
   float _editTempMin = 18.0f;
   float _editTempMax = 24.0f;
@@ -133,10 +166,26 @@ private:
 
   void handleMainScreen(const InputsSnapshot& s);
   void handleMenuScreen(const InputsSnapshot& s);
-  bool handleEditRpm(const InputsSnapshot& s);
   // Steps
+  void handleProfileMenu(const InputsSnapshot& s);
+  void handleProfileEditMenu(const InputsSnapshot& s);
+  void handleProfileSettingsMenu(const InputsSnapshot& s);
   void handleStepsMenu(const InputsSnapshot& s);
+  void handleStepDetailMenu(const InputsSnapshot& s);
   bool handleEditStepDuration(const InputsSnapshot& s);
+  bool handleEditStepRpm(const InputsSnapshot& s);
+  bool handleEditStepTempMode(const InputsSnapshot& s);
+  bool handleEditStepTempTarget(const InputsSnapshot& s);
+  bool handleEditStepTempBiasMode(const InputsSnapshot& s);
+  bool handleEditStepTempBias(const InputsSnapshot& s);
+  bool handleEditStepName(const InputsSnapshot& s);
+  // Step-level temp coef override
+  bool handleEditStepTempCoefOverride(const InputsSnapshot& s);
+  bool handleEditStepTempCoefEnabled(const InputsSnapshot& s);
+  bool handleEditStepTempCoefBase(const InputsSnapshot& s);
+  bool handleEditStepTempCoefPercent(const InputsSnapshot& s);
+  bool handleEditStepTempCoefTarget(const InputsSnapshot& s);
+  bool handleEditStepTempAlarmAction(const InputsSnapshot& s);
   // Reverse
   void handleReverseMenu(const InputsSnapshot& s);
   bool handleEditReverseEnabled(const InputsSnapshot& s);
@@ -147,6 +196,7 @@ private:
   bool handleEditTempCoefBase(const InputsSnapshot& s);
   bool handleEditTempCoefPercent(const InputsSnapshot& s);
   bool handleEditTempCoefTarget(const InputsSnapshot& s);
+  bool handleEditTempAlarmAction(const InputsSnapshot& s);
   // Temp limits
   bool handleEditTempLimitsEnabled(const InputsSnapshot& s);
   bool handleEditTempMin(const InputsSnapshot& s);

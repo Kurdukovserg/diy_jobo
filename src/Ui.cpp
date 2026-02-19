@@ -20,20 +20,35 @@ void Ui::draw(const UiModel& m) {
   switch (m.screen) {
     case Screen::Main:      drawMain(m); break;
     case Screen::Menu:      drawMenu(m); break;
-    case Screen::EditRpm:   drawEditRpm(m); break;
-    // Steps
+    // Profile
+    case Screen::ProfileMenu: drawProfileMenu(m); break;
+    case Screen::ProfileEditMenu: drawProfileEditMenu(m); break;
+    case Screen::ProfileSettingsMenu: drawProfileSettingsMenu(m); break;
     case Screen::StepsMenu: drawStepsMenu(m); break;
+    case Screen::StepDetailMenu: drawStepDetailMenu(m); break;
     case Screen::EditStepDuration: drawEditStepDuration(m); break;
+    case Screen::EditStepRpm: drawEditStepRpm(m); break;
+    case Screen::EditStepTempMode: drawEditStepTempMode(m); break;
+    case Screen::EditStepTempTarget: drawEditStepTempTarget(m); break;
+    case Screen::EditStepTempBiasMode: drawEditStepTempBiasMode(m); break;
+    case Screen::EditStepTempBias: drawEditStepTempBias(m); break;
+    case Screen::EditStepName: drawEditStepName(m); break;
+    case Screen::EditStepTempCoefOverride: drawEditStepTempCoefOverride(m); break;
+    case Screen::EditStepTempCoefEnabled: drawEditTempCoefEnabled(m); break;
+    case Screen::EditStepTempCoefBase: drawEditTempCoefBase(m); break;
+    case Screen::EditStepTempCoefPercent: drawEditTempCoefPercent(m); break;
+    case Screen::EditStepTempCoefTarget: drawEditTempCoefTarget(m); break;
+    case Screen::EditStepTempAlarmAction: drawEditTempAlarmAction(m); break;
     // Reverse
     case Screen::ReverseMenu: drawReverseMenu(m); break;
     case Screen::EditReverseEnabled: drawEditReverseEnabled(m); break;
     case Screen::EditReverseInterval: drawEditReverseInterval(m); break;
-    // TempCoef
-    case Screen::TempCoefMenu: drawTempCoefMenu(m); break;
+    // TempCoef (accessed from ProfileSettingsMenu)
     case Screen::EditTempCoefEnabled: drawEditTempCoefEnabled(m); break;
     case Screen::EditTempCoefBase: drawEditTempCoefBase(m); break;
     case Screen::EditTempCoefPercent: drawEditTempCoefPercent(m); break;
     case Screen::EditTempCoefTarget: drawEditTempCoefTarget(m); break;
+    case Screen::EditTempAlarmAction: drawEditTempAlarmAction(m); break;
     // Temp limits
     case Screen::EditTempLimitsEnabled: drawEditTempLimitsEnabled(m); break;
     case Screen::EditTempMin: drawEditTempMin(m); break;
@@ -63,9 +78,13 @@ void Ui::draw(const UiModel& m) {
 void Ui::drawMain(const UiModel& m) {
   const int x = 2;
 
-  // Header
+  // Header with profile name or "DIY JOBO"
   _u8g2.setFont(u8g2_font_5x8_tf);
-  _u8g2.drawStr(x, 9, "DIY JOBO");
+  if (m.profileName[0] != '\0') {
+    _u8g2.drawStr(x, 9, m.profileName);
+  } else {
+    _u8g2.drawStr(x, 9, "DIY JOBO");
+  }
   
   char statusBuf[16];
   if (m.run) {
@@ -75,52 +94,80 @@ void Ui::drawMain(const UiModel& m) {
   } else {
     snprintf(statusBuf, sizeof(statusBuf), "STOP");
   }
-  _u8g2.drawStr(80, 9, statusBuf);
+  _u8g2.drawStr(100, 9, statusBuf);
   _u8g2.drawHLine(x, 11, 124);
 
-  // RPM - show adjusted value if temp coef is active and affects RPM
-  _u8g2.setFont(u8g2_font_6x13_tf);
-  char buf[32];
-  bool rpmAdjusted = m.tempCoefEnabled && 
-    (m.tempCoefTarget == TempCoefTarget::Rpm || m.tempCoefTarget == TempCoefTarget::Both) &&
-    m.hasTemp && !isnan(m.tempC) && (int32_t)m.adjustedRpm != m.rpm;
-  if (rpmAdjusted) {
-    snprintf(buf, sizeof(buf), "RPM: %ld>%.0f (%.0f)", (long)m.rpm, m.adjustedRpm, m.currentRpm);
-  } else {
-    snprintf(buf, sizeof(buf), "RPM: %ld (%.0f)", (long)m.rpm, m.currentRpm);
-  }
-  _u8g2.drawStr(x, 26, buf);
-
-  // Temperature + coefficient indicator + alarm
-  char tbuf[32];
-  if (!m.hasTemp || isnan(m.tempC)) {
-    snprintf(tbuf, sizeof(tbuf), "T: --.-C%s", m.tempCoefEnabled ? " *" : "");
-  } else {
-    const char* alarmStr = "";
-    if (m.tempAlarm) alarmStr = m.tempLow ? " LOW!" : " HIGH!";
-    snprintf(tbuf, sizeof(tbuf), "T: %.1fC%s%s", m.tempC, m.tempCoefEnabled ? "*" : "", alarmStr);
-  }
-  _u8g2.drawStr(x, 40, tbuf);
-
-  // Step progress
-  _u8g2.setFont(u8g2_font_5x8_tf);
-  char stepBuf[32];
+  // BIG STEP INDICATOR - center of screen
   if (m.stepCount > 0 && m.totalRemainingSec > 0) {
     int mins = m.stepRemainingSec / 60;
     int secs = m.stepRemainingSec % 60;
-    if (m.isPaused) {
-      snprintf(stepBuf, sizeof(stepBuf), "STEP %d/%d DONE - OK:next", m.currentStep + 1, m.stepCount);
+    
+    // Step name or "Step N"
+    _u8g2.setFont(u8g2_font_6x13_tf);
+    char stepNameBuf[24];
+    if (m.currentStepName[0] != '\0') {
+      snprintf(stepNameBuf, sizeof(stepNameBuf), "%s", m.currentStepName);
     } else {
-      snprintf(stepBuf, sizeof(stepBuf), "Step %d/%d: %d:%02d", m.currentStep + 1, m.stepCount, mins, secs);
+      snprintf(stepNameBuf, sizeof(stepNameBuf), "Step %d", m.currentStep + 1);
     }
+    int nameW = _u8g2.getStrWidth(stepNameBuf);
+    _u8g2.drawStr((128 - nameW) / 2, 24, stepNameBuf);
+    
+    // Big timer display
+    _u8g2.setFont(u8g2_font_logisoso18_tf);
+    char timeBuf[12];
+    if (m.isPaused) {
+      snprintf(timeBuf, sizeof(timeBuf), "DONE");
+    } else {
+      snprintf(timeBuf, sizeof(timeBuf), "%d:%02d", mins, secs);
+    }
+    int timeW = _u8g2.getStrWidth(timeBuf);
+    _u8g2.drawStr((128 - timeW) / 2, 46, timeBuf);
+    
+    // RPM and Temp on bottom - compact
+    _u8g2.setFont(u8g2_font_5x8_tf);
+    char infoBuf[32];
+    if (!m.hasTemp || isnan(m.tempC)) {
+      snprintf(infoBuf, sizeof(infoBuf), "R:%ld T:--", (long)m.currentStepRpm);
+    } else {
+      snprintf(infoBuf, sizeof(infoBuf), "R:%ld T:%.1f%s", (long)m.currentStepRpm, m.tempC, 
+               m.tempAlarm ? (m.tempLow ? "!" : "!") : "");
+    }
+    _u8g2.drawStr(x, 56, infoBuf);
+    
+    // Step progress indicator on right
+    char progBuf[8];
+    snprintf(progBuf, sizeof(progBuf), "%d/%d", m.currentStep + 1, m.stepCount);
+    _u8g2.drawStr(100, 56, progBuf);
   } else {
+    // Not running - show RPM and temp in standard layout
+    _u8g2.setFont(u8g2_font_6x13_tf);
+    char buf[32];
+    snprintf(buf, sizeof(buf), "RPM: %ld (%.0f)", (long)m.rpm, m.currentRpm);
+    _u8g2.drawStr(x, 26, buf);
+
+    // Temperature
+    char tbuf[32];
+    if (!m.hasTemp || isnan(m.tempC)) {
+      snprintf(tbuf, sizeof(tbuf), "T: --.-C%s", m.tempCoefEnabled ? " *" : "");
+    } else {
+      const char* alarmStr = "";
+      if (m.tempAlarm) alarmStr = m.tempLow ? " LOW!" : " HIGH!";
+      snprintf(tbuf, sizeof(tbuf), "T: %.1fC%s%s", m.tempC, m.tempCoefEnabled ? "*" : "", alarmStr);
+    }
+    _u8g2.drawStr(x, 40, tbuf);
+
+    // Steps count
+    _u8g2.setFont(u8g2_font_5x8_tf);
+    char stepBuf[24];
     snprintf(stepBuf, sizeof(stepBuf), "Steps: %d", m.stepCount);
+    _u8g2.drawStr(x, 52, stepBuf);
   }
-  _u8g2.drawStr(x, 52, stepBuf);
 
   // Hint line
+  _u8g2.setFont(u8g2_font_5x8_tf);
   if (m.isPaused) {
-    _u8g2.drawStr(x, 63, "OK:next step  BACK:stop");
+    _u8g2.drawStr(x, 63, "OK:next  BACK:stop");
   } else {
     _u8g2.drawStr(x, 63, "OK:run ENC:menu BACK:stop");
   }
@@ -128,14 +175,14 @@ void Ui::drawMain(const UiModel& m) {
 
 void Ui::drawMenu(const UiModel& m) {
   const int x = 2;
-  const int8_t TOTAL = 6;  // RPM, Steps, Reverse, TempCoef, Buzzer, Hardware
+  const int8_t TOTAL = 4;  // Profile, Reverse, Buzzer, Hardware
   
   _u8g2.setFont(u8g2_font_6x13_tf);
   _u8g2.drawStr(x, 12, "SETTINGS");
   _u8g2.drawHLine(x, 14, 124);
 
   _u8g2.setFont(u8g2_font_5x8_tf);
-  const char* items[] = {"RPM", "Steps", "Reverse", "TempCoef", "Buzzer", "Hardware"};
+  const char* items[] = {"Profile", "Reverse", "Buzzer", "Hardware"};
   char buf[32];
   
   int8_t startY = 26;
@@ -154,8 +201,7 @@ void Ui::drawMenu(const UiModel& m) {
     }
     
     switch (idx) {
-      case 0: snprintf(buf, sizeof(buf), "%s: %ld", items[idx], (long)m.rpm); break;
-      case 1: snprintf(buf, sizeof(buf), "%s (%d) >", items[idx], m.stepCount); break;
+      case 0: snprintf(buf, sizeof(buf), "%s (%d) >", items[idx], m.stepCount); break;
       default: snprintf(buf, sizeof(buf), "%s >", items[idx]); break;
     }
     _u8g2.drawStr(x, y, buf);
@@ -165,20 +211,112 @@ void Ui::drawMenu(const UiModel& m) {
   _u8g2.drawStr(x, 63, "ENC:sel  OK:edit  BACK:exit");
 }
 
-void Ui::drawEditRpm(const UiModel& m) {
+// ===== Profile Submenu =====
+void Ui::drawProfileMenu(const UiModel& m) {
   const int x = 2;
   _u8g2.setFont(u8g2_font_6x13_tf);
-  _u8g2.drawStr(x, 12, "SET RPM");
+  _u8g2.drawStr(x, 12, "PROFILE");
   _u8g2.drawHLine(x, 14, 124);
 
-  _u8g2.setFont(u8g2_font_fur30_tf);
-  char buf[8];
-  snprintf(buf, sizeof(buf), "%ld", (long)m.rpm);
-  int w = _u8g2.getStrWidth(buf);
-  _u8g2.drawStr((128 - w) / 2, 48, buf);
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  // Future: will have Default, Custom, Profile1, etc.
+  const char* items[] = {"Custom"};
+  
+  for (int i = 0; i < 1; i++) {
+    int y = 30 + i * 14;
+    bool sel = (i == m.subMenuIdx);
+    if (sel) {
+      _u8g2.drawBox(0, y - 10, 128, 13);
+      _u8g2.setDrawColor(0);
+    }
+    char buf[24];
+    snprintf(buf, sizeof(buf), "%s >", items[i]);
+    _u8g2.drawStr(x, y, buf);
+    _u8g2.setDrawColor(1);
+  }
+  _u8g2.drawStr(x, 63, "OK:select  BACK:menu");
+}
+
+void Ui::drawProfileEditMenu(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  _u8g2.drawStr(x, 12, "CUSTOM PROFILE");
+  _u8g2.drawHLine(x, 14, 124);
 
   _u8g2.setFont(u8g2_font_5x8_tf);
-  _u8g2.drawStr(x, 63, "ENC:adj  OK:save  BACK:cancel");
+  const char* items[] = {"Settings", "Steps"};
+  
+  for (int i = 0; i < 2; i++) {
+    int y = 30 + i * 14;
+    bool sel = (i == m.subMenuIdx);
+    if (sel) {
+      _u8g2.drawBox(0, y - 10, 128, 13);
+      _u8g2.setDrawColor(0);
+    }
+    char buf[24];
+    if (i == 1) {
+      snprintf(buf, sizeof(buf), "%s (%d) >", items[i], m.stepCount);
+    } else {
+      snprintf(buf, sizeof(buf), "%s >", items[i]);
+    }
+    _u8g2.drawStr(x, y, buf);
+    _u8g2.setDrawColor(1);
+  }
+  _u8g2.drawStr(x, 63, "OK:select  BACK:profiles");
+}
+
+void Ui::drawProfileSettingsMenu(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  _u8g2.drawStr(x, 12, "PROFILE SETTINGS");
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  const char* items[] = {"TempCoef", "Base", "Percent", "Target", "Alarm", "Limits", "Min", "Max"};
+  char buf[32];
+  
+  const int8_t VISIBLE = 4;
+  const int8_t TOTAL = 8;
+  int8_t scroll = 0;
+  if (m.subMenuIdx >= VISIBLE) scroll = m.subMenuIdx - VISIBLE + 1;
+  
+  for (int8_t i = 0; i < VISIBLE && (scroll + i) < TOTAL; i++) {
+    int8_t idx = scroll + i;
+    int y = 24 + i * 10;
+    
+    if (idx == m.subMenuIdx) {
+      _u8g2.drawBox(0, y - 8, 128, 10);
+      _u8g2.setDrawColor(0);
+    }
+    
+    switch (idx) {
+      case 0: snprintf(buf, sizeof(buf), "%s: %s", items[idx], m.tempCoefEnabled ? "ON" : "OFF"); break;
+      case 1: snprintf(buf, sizeof(buf), "%s: %.1fC", items[idx], m.tempCoefBase); break;
+      case 2: snprintf(buf, sizeof(buf), "%s: %.0f%%", items[idx], m.tempCoefPercent); break;
+      case 3: {
+        const char* tgt = "Timer";
+        if (m.tempCoefTarget == TempCoefTarget::Rpm) tgt = "RPM";
+        else if (m.tempCoefTarget == TempCoefTarget::Both) tgt = "Both";
+        snprintf(buf, sizeof(buf), "%s: %s", items[idx], tgt);
+        break;
+      }
+      case 4: {
+        const char* act = "None";
+        if (m.tempAlarmAction == 1) act = "Beep";
+        else if (m.tempAlarmAction == 2) act = "Pause";
+        else if (m.tempAlarmAction == 3) act = "Stop";
+        snprintf(buf, sizeof(buf), "%s: %s", items[idx], act);
+        break;
+      }
+      case 5: snprintf(buf, sizeof(buf), "%s: %s", items[idx], m.tempLimitsEnabled ? "ON" : "OFF"); break;
+      case 6: snprintf(buf, sizeof(buf), "%s: %.1fC", items[idx], m.tempMin); break;
+      case 7: snprintf(buf, sizeof(buf), "%s: %.1fC", items[idx], m.tempMax); break;
+    }
+    _u8g2.drawStr(x, y, buf);
+    _u8g2.setDrawColor(1);
+  }
+
+  _u8g2.drawStr(x, 63, "OK:edit  BACK:profile");
 }
 
 // ===== Steps Submenu =====
@@ -249,6 +387,221 @@ void Ui::drawEditStepDuration(const UiModel& m) {
 
   _u8g2.setFont(u8g2_font_5x8_tf);
   _u8g2.drawStr(x, 63, "ENC:+/-10s  OK:save  BACK:cancel");
+}
+
+void Ui::drawStepDetailMenu(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  char title[24];
+  snprintf(title, sizeof(title), "STEP %d", m.editStepIdx + 1);
+  _u8g2.drawStr(x, 12, title);
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  const char* items[] = {"Duration", "RPM", "Temp", "Bias", "Name", "TempCoef"};
+  char buf[32];
+  
+  const int8_t TOTAL = 6;
+  const int8_t VISIBLE = 4;
+  int8_t scroll = 0;
+  if (m.editStepDetailIdx >= VISIBLE) scroll = m.editStepDetailIdx - VISIBLE + 1;
+  
+  for (int8_t v = 0; v < VISIBLE && (scroll + v) < TOTAL; v++) {
+    int8_t i = scroll + v;
+    int y = 24 + v * 10;
+    bool sel = (i == m.editStepDetailIdx);
+    if (sel) {
+      _u8g2.drawBox(0, y - 7, 128, 10);
+      _u8g2.setDrawColor(0);
+    }
+    
+    switch (i) {
+      case 0: {
+        int32_t dur = m.stepDurations[m.editStepIdx];
+        snprintf(buf, sizeof(buf), "%s: %d:%02d", items[i], (int)(dur/60), (int)(dur%60));
+        break;
+      }
+      case 1:
+        snprintf(buf, sizeof(buf), "%s: %ld", items[i], (long)m.editStepRpm);
+        break;
+      case 2:
+        if (m.editStepTempMode == 0) {
+          snprintf(buf, sizeof(buf), "%s: OFF", items[i]);
+        } else {
+          snprintf(buf, sizeof(buf), "%s: %.1fC", items[i], m.editStepTempTarget);
+        }
+        break;
+      case 3:
+        if (m.editStepTempBiasMode == 0) {
+          snprintf(buf, sizeof(buf), "%s: OFF", items[i]);
+        } else {
+          snprintf(buf, sizeof(buf), "%s: +/-%.1fC", items[i], m.editStepTempBias);
+        }
+        break;
+      case 4:
+        if (m.editStepName[0] != '\0') {
+          snprintf(buf, sizeof(buf), "%s: %s", items[i], m.editStepName);
+        } else {
+          snprintf(buf, sizeof(buf), "%s: (none)", items[i]);
+        }
+        break;
+      case 5:
+        snprintf(buf, sizeof(buf), "%s: %s >", items[i], m.editStepTempCoefOverride ? "Custom" : "Profile");
+        break;
+    }
+    _u8g2.drawStr(x, y, buf);
+    _u8g2.setDrawColor(1);
+  }
+
+  _u8g2.drawStr(x, 63, "OK:edit  BACK:steps");
+}
+
+void Ui::drawEditStepRpm(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  char title[24];
+  snprintf(title, sizeof(title), "STEP %d RPM", m.editStepIdx + 1);
+  _u8g2.drawStr(x, 12, title);
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_fur30_tf);
+  char buf[8];
+  snprintf(buf, sizeof(buf), "%ld", (long)m.editStepRpm);
+  int w = _u8g2.getStrWidth(buf);
+  _u8g2.drawStr((128 - w) / 2, 48, buf);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  _u8g2.drawStr(x, 63, "ENC:adj  OK:save  BACK:cancel");
+}
+
+void Ui::drawEditStepTempMode(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  char title[24];
+  snprintf(title, sizeof(title), "STEP %d TEMP", m.editStepIdx + 1);
+  _u8g2.drawStr(x, 12, title);
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_fur30_tf);
+  const char* val = (m.editStepTempMode == 0) ? "OFF" : "ON";
+  int w = _u8g2.getStrWidth(val);
+  _u8g2.drawStr((128 - w) / 2, 48, val);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  _u8g2.drawStr(x, 63, "ENC:toggle  OK:save  BACK:cancel");
+}
+
+void Ui::drawEditStepTempTarget(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  char title[24];
+  snprintf(title, sizeof(title), "STEP %d TARGET", m.editStepIdx + 1);
+  _u8g2.drawStr(x, 12, title);
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_fur30_tf);
+  char buf[16];
+  snprintf(buf, sizeof(buf), "%.1f", m.editStepTempTarget);
+  int w = _u8g2.getStrWidth(buf);
+  _u8g2.drawStr((128 - w) / 2, 48, buf);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  _u8g2.drawStr(x, 63, "ENC:+/-0.5  OK:save  BACK:cancel");
+}
+
+void Ui::drawEditStepTempBiasMode(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  char title[24];
+  snprintf(title, sizeof(title), "STEP %d BIAS", m.editStepIdx + 1);
+  _u8g2.drawStr(x, 12, title);
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_fur30_tf);
+  const char* val = (m.editStepTempBiasMode == 0) ? "OFF" : "ON";
+  int w = _u8g2.getStrWidth(val);
+  _u8g2.drawStr((128 - w) / 2, 48, val);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  _u8g2.drawStr(x, 63, "ENC:toggle  OK:save  BACK:cancel");
+}
+
+void Ui::drawEditStepTempBias(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  char title[24];
+  snprintf(title, sizeof(title), "STEP %d +/-", m.editStepIdx + 1);
+  _u8g2.drawStr(x, 12, title);
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_fur30_tf);
+  char buf[16];
+  snprintf(buf, sizeof(buf), "%.1f", m.editStepTempBias);
+  int w = _u8g2.getStrWidth(buf);
+  _u8g2.drawStr((128 - w) / 2, 48, buf);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  _u8g2.drawStr(x, 63, "ENC:+/-0.5  OK:save  BACK:cancel");
+}
+
+void Ui::drawEditStepName(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  char title[24];
+  snprintf(title, sizeof(title), "STEP %d NAME", m.editStepIdx + 1);
+  _u8g2.drawStr(x, 12, title);
+  _u8g2.drawHLine(x, 14, 124);
+
+  // Show name with cursor
+  _u8g2.setFont(u8g2_font_10x20_tf);
+  char nameBuf[16];
+  strncpy(nameBuf, m.editStepName, sizeof(nameBuf) - 1);
+  nameBuf[sizeof(nameBuf) - 1] = '\0';
+  int w = _u8g2.getStrWidth(nameBuf);
+  int nameX = (128 - w) / 2;
+  _u8g2.drawStr(nameX, 40, nameBuf);
+  
+  // Draw cursor underline
+  int cursorX = nameX + m.editNameCursor * 10;  // approximate char width
+  _u8g2.drawHLine(cursorX, 42, 9);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  _u8g2.drawStr(x, 63, "ENC:char OK:next BACK:prev/exit");
+}
+
+void Ui::drawEditStepTempCoefOverride(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  char title[24];
+  snprintf(title, sizeof(title), "STEP %d TEMPCOEF", m.editStepIdx + 1);
+  _u8g2.drawStr(x, 12, title);
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_fur30_tf);
+  const char* val = m.editStepTempCoefOverride ? "Custom" : "Profile";
+  int w = _u8g2.getStrWidth(val);
+  _u8g2.drawStr((128 - w) / 2, 48, val);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  _u8g2.drawStr(x, 63, "ENC:toggle  OK:save  BACK:cancel");
+}
+
+void Ui::drawEditTempAlarmAction(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  _u8g2.drawStr(x, 12, "ALARM ACTION");
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_fur30_tf);
+  const char* val = "None";
+  if (m.tempAlarmAction == 1) val = "Beep";
+  else if (m.tempAlarmAction == 2) val = "Pause";
+  else if (m.tempAlarmAction == 3) val = "Stop";
+  int w = _u8g2.getStrWidth(val);
+  _u8g2.drawStr((128 - w) / 2, 48, val);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  _u8g2.drawStr(x, 63, "ENC:select  OK:save  BACK:cancel");
 }
 
 // ===== Reverse Submenu =====

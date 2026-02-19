@@ -14,15 +14,61 @@ bool MenuController::handleInput(const InputsSnapshot& s) {
     case Screen::Menu:
       handleMenuScreen(s);
       break;
-    case Screen::EditRpm:
-      settingsChanged = handleEditRpm(s);
+    // Profile submenu
+    case Screen::ProfileMenu:
+      handleProfileMenu(s);
       break;
-    // Steps submenu
+    case Screen::ProfileEditMenu:
+      handleProfileEditMenu(s);
+      break;
+    case Screen::ProfileSettingsMenu:
+      handleProfileSettingsMenu(s);
+      break;
     case Screen::StepsMenu:
       handleStepsMenu(s);
       break;
+    case Screen::StepDetailMenu:
+      handleStepDetailMenu(s);
+      break;
     case Screen::EditStepDuration:
       settingsChanged = handleEditStepDuration(s);
+      break;
+    case Screen::EditStepRpm:
+      settingsChanged = handleEditStepRpm(s);
+      break;
+    case Screen::EditStepTempMode:
+      settingsChanged = handleEditStepTempMode(s);
+      break;
+    case Screen::EditStepTempTarget:
+      settingsChanged = handleEditStepTempTarget(s);
+      break;
+    case Screen::EditStepTempBiasMode:
+      settingsChanged = handleEditStepTempBiasMode(s);
+      break;
+    case Screen::EditStepTempBias:
+      settingsChanged = handleEditStepTempBias(s);
+      break;
+    case Screen::EditStepName:
+      settingsChanged = handleEditStepName(s);
+      break;
+    // Step-level temp coef override
+    case Screen::EditStepTempCoefOverride:
+      settingsChanged = handleEditStepTempCoefOverride(s);
+      break;
+    case Screen::EditStepTempCoefEnabled:
+      settingsChanged = handleEditStepTempCoefEnabled(s);
+      break;
+    case Screen::EditStepTempCoefBase:
+      settingsChanged = handleEditStepTempCoefBase(s);
+      break;
+    case Screen::EditStepTempCoefPercent:
+      settingsChanged = handleEditStepTempCoefPercent(s);
+      break;
+    case Screen::EditStepTempCoefTarget:
+      settingsChanged = handleEditStepTempCoefTarget(s);
+      break;
+    case Screen::EditStepTempAlarmAction:
+      settingsChanged = handleEditStepTempAlarmAction(s);
       break;
     // Reverse submenu
     case Screen::ReverseMenu:
@@ -34,10 +80,7 @@ bool MenuController::handleInput(const InputsSnapshot& s) {
     case Screen::EditReverseInterval:
       settingsChanged = handleEditReverseInterval(s);
       break;
-    // TempCoef submenu
-    case Screen::TempCoefMenu:
-      handleTempCoefMenu(s);
-      break;
+    // TempCoef (accessed from ProfileSettingsMenu now)
     case Screen::EditTempCoefEnabled:
       settingsChanged = handleEditTempCoefEnabled(s);
       break;
@@ -49,6 +92,9 @@ bool MenuController::handleInput(const InputsSnapshot& s) {
       break;
     case Screen::EditTempCoefTarget:
       settingsChanged = handleEditTempCoefTarget(s);
+      break;
+    case Screen::EditTempAlarmAction:
+      settingsChanged = handleEditTempAlarmAction(s);
       break;
     // Temp limits
     case Screen::EditTempLimitsEnabled:
@@ -150,25 +196,16 @@ void MenuController::handleMenuScreen(const InputsSnapshot& s) {
     _subMenuIdx = 0;
     switch (_menuIdx) {
       case 0: 
-        _editRpm = _session->settings().targetRpm;
-        _screen = Screen::EditRpm; 
+        _screen = Screen::ProfileMenu; 
         break;
       case 1: 
-        _screen = Screen::StepsMenu; 
-        break;
-      case 2: 
         _screen = Screen::ReverseMenu; 
         break;
-      case 3: 
-        _screen = Screen::TempCoefMenu; 
-        break;
-      case 4:
+      case 2:
         _screen = Screen::BuzzerMenu;
-        _subMenuIdx = 0;
         break;
-      case 5:
+      case 3:
         _screen = Screen::HardwareMenu;
-        _subMenuIdx = 0;
         break;
     }
   }
@@ -178,25 +215,113 @@ void MenuController::handleMenuScreen(const InputsSnapshot& s) {
   }
 }
 
-bool MenuController::handleEditRpm(const InputsSnapshot& s) {
-  bool changed = false;
+// ===== Profile Submenu =====
+void MenuController::handleProfileMenu(const InputsSnapshot& s) {
+  // Items: Custom (future: Default, Profile1, Profile2, etc.)
+  const int8_t ITEMS = 1;
   
   if (s.encDelta != 0) {
-    _editRpm += s.encDelta;
-    if (_editRpm < RPM_MIN) _editRpm = RPM_MIN;
-    if (_editRpm > RPM_MAX) _editRpm = RPM_MAX;
+    _subMenuIdx += s.encDelta;
+    if (_subMenuIdx < 0) _subMenuIdx = ITEMS - 1;
+    if (_subMenuIdx >= ITEMS) _subMenuIdx = 0;
   }
 
   if (s.okPressed || s.encSwPressed) {
-    _session->settings().targetRpm = _editRpm;
-    _screen = Screen::Menu;
-    changed = true;
+    switch (_subMenuIdx) {
+      case 0:  // Custom profile
+        _subMenuIdx = 0;
+        _screen = Screen::ProfileEditMenu;
+        break;
+      // Future: case 1: Default profile, case 2: Profile1, etc.
+    }
   }
+
   if (s.backPressed || s.a0BackPressed) {
     _screen = Screen::Menu;
   }
+}
+
+void MenuController::handleProfileEditMenu(const InputsSnapshot& s) {
+  // Items: Settings, Steps
+  const int8_t ITEMS = 2;
   
-  return changed;
+  if (s.encDelta != 0) {
+    _subMenuIdx += s.encDelta;
+    if (_subMenuIdx < 0) _subMenuIdx = ITEMS - 1;
+    if (_subMenuIdx >= ITEMS) _subMenuIdx = 0;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    switch (_subMenuIdx) {
+      case 0:  // Settings
+        _subMenuIdx = 0;
+        _screen = Screen::ProfileSettingsMenu;
+        break;
+      case 1:  // Steps
+        _subMenuIdx = 0;
+        _screen = Screen::StepsMenu;
+        break;
+    }
+  }
+
+  if (s.backPressed || s.a0BackPressed) {
+    _subMenuIdx = 0;
+    _screen = Screen::ProfileMenu;
+  }
+}
+
+void MenuController::handleProfileSettingsMenu(const InputsSnapshot& s) {
+  // Items: TempCoef Enabled, Base, %, Target, Alarm Action, TempLimits Enabled, Min, Max
+  const int8_t ITEMS = 8;
+  
+  if (s.encDelta != 0) {
+    _subMenuIdx += s.encDelta;
+    if (_subMenuIdx < 0) _subMenuIdx = ITEMS - 1;
+    if (_subMenuIdx >= ITEMS) _subMenuIdx = 0;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    const auto& set = _session->settings();
+    switch (_subMenuIdx) {
+      case 0:
+        _editTempCoefEnabled = set.tempCoefEnabled;
+        _screen = Screen::EditTempCoefEnabled;
+        break;
+      case 1:
+        _editTempCoefBase = set.tempCoefBase;
+        _screen = Screen::EditTempCoefBase;
+        break;
+      case 2:
+        _editTempCoefPercent = set.tempCoefPercent;
+        _screen = Screen::EditTempCoefPercent;
+        break;
+      case 3:
+        _editTempCoefTarget = set.tempCoefTarget;
+        _screen = Screen::EditTempCoefTarget;
+        break;
+      case 4:
+        _editTempAlarmAction = set.tempAlarmAction;
+        _screen = Screen::EditTempAlarmAction;
+        break;
+      case 5:
+        _editTempLimitsEnabled = set.tempLimitsEnabled;
+        _screen = Screen::EditTempLimitsEnabled;
+        break;
+      case 6:
+        _editTempMin = set.tempMin;
+        _screen = Screen::EditTempMin;
+        break;
+      case 7:
+        _editTempMax = set.tempMax;
+        _screen = Screen::EditTempMax;
+        break;
+    }
+  }
+
+  if (s.backPressed || s.a0BackPressed) {
+    _subMenuIdx = 0;
+    _screen = Screen::ProfileEditMenu;
+  }
 }
 
 // ===== Steps Submenu =====
@@ -213,17 +338,24 @@ void MenuController::handleStepsMenu(const InputsSnapshot& s) {
 
   if (s.okPressed || s.encSwPressed) {
     if (_subMenuIdx < set.stepCount) {
-      // Edit existing step
+      // Edit existing step - go to detail menu
       _editStepIdx = _subMenuIdx;
-      _editStepDuration = set.steps[_editStepIdx].durationSec;
-      _screen = Screen::EditStepDuration;
+      _editStepDetailIdx = 0;
+      _screen = Screen::StepDetailMenu;
     } else if (set.stepCount < MAX_STEPS) {
-      // Add new step
-      set.steps[set.stepCount].durationSec = 60;  // default 1 min
+      // Add new step with defaults
+      auto& step = set.steps[set.stepCount];
+      step.durationSec = 60;  // default 1 min
+      step.rpm = 30;
+      step.tempMode = StepTempMode::Off;
+      step.tempTarget = 20.0f;
+      step.tempBiasMode = StepTempBiasMode::Off;
+      step.tempBias = 2.0f;
+      step.name[0] = '\0';
       set.stepCount++;
       _editStepIdx = set.stepCount - 1;
-      _editStepDuration = set.steps[_editStepIdx].durationSec;
-      _screen = Screen::EditStepDuration;
+      _editStepDetailIdx = 0;
+      _screen = Screen::StepDetailMenu;
     }
   }
 
@@ -238,7 +370,57 @@ void MenuController::handleStepsMenu(const InputsSnapshot& s) {
   }
 
   if (s.backPressed || s.a0BackPressed) {
-    _screen = Screen::Menu;
+    _subMenuIdx = 1;  // Return to Steps item in ProfileEditMenu
+    _screen = Screen::ProfileEditMenu;
+  }
+}
+
+// Step detail menu - shows Duration, RPM, Temp, TempBias, Name, TempCoef Override
+void MenuController::handleStepDetailMenu(const InputsSnapshot& s) {
+  const int8_t ITEMS = 6;  // Duration, RPM, Temp, TempBias, Name, TempCoef
+  
+  if (s.encDelta != 0) {
+    _editStepDetailIdx += s.encDelta;
+    if (_editStepDetailIdx < 0) _editStepDetailIdx = ITEMS - 1;
+    if (_editStepDetailIdx >= ITEMS) _editStepDetailIdx = 0;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    const auto& step = _session->settings().steps[_editStepIdx];
+    switch (_editStepDetailIdx) {
+      case 0:  // Duration
+        _editStepDuration = step.durationSec;
+        _screen = Screen::EditStepDuration;
+        break;
+      case 1:  // RPM
+        _editStepRpm = step.rpm;
+        _screen = Screen::EditStepRpm;
+        break;
+      case 2:  // Temp mode
+        _editStepTempMode = step.tempMode;
+        _editStepTempTarget = step.tempTarget;
+        _screen = Screen::EditStepTempMode;
+        break;
+      case 3:  // Temp bias mode
+        _editStepTempBiasMode = step.tempBiasMode;
+        _editStepTempBias = step.tempBias;
+        _screen = Screen::EditStepTempBiasMode;
+        break;
+      case 4:  // Name
+        strncpy(_editStepName, step.name, STEP_NAME_LEN - 1);
+        _editStepName[STEP_NAME_LEN - 1] = '\0';
+        _editNameCursor = strlen(_editStepName);
+        _screen = Screen::EditStepName;
+        break;
+      case 5:  // TempCoef override
+        _editStepTempCoefOverride = step.tempCoefOverride;
+        _screen = Screen::EditStepTempCoefOverride;
+        break;
+    }
+  }
+
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::StepsMenu;
   }
 }
 
@@ -253,11 +435,334 @@ bool MenuController::handleEditStepDuration(const InputsSnapshot& s) {
 
   if (s.okPressed || s.encSwPressed) {
     _session->settings().steps[_editStepIdx].durationSec = _editStepDuration;
-    _screen = Screen::StepsMenu;
+    _screen = Screen::StepDetailMenu;
     changed = true;
   }
   if (s.backPressed || s.a0BackPressed) {
-    _screen = Screen::StepsMenu;
+    _screen = Screen::StepDetailMenu;
+  }
+  
+  return changed;
+}
+
+bool MenuController::handleEditStepRpm(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    _editStepRpm += s.encDelta;
+    if (_editStepRpm < RPM_MIN) _editStepRpm = RPM_MIN;
+    if (_editStepRpm > RPM_MAX) _editStepRpm = RPM_MAX;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    _session->settings().steps[_editStepIdx].rpm = _editStepRpm;
+    _screen = Screen::StepDetailMenu;
+    changed = true;
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::StepDetailMenu;
+  }
+  
+  return changed;
+}
+
+bool MenuController::handleEditStepTempMode(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    // Toggle between Off and Target
+    _editStepTempMode = (_editStepTempMode == StepTempMode::Off) 
+                        ? StepTempMode::Target : StepTempMode::Off;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    _session->settings().steps[_editStepIdx].tempMode = _editStepTempMode;
+    if (_editStepTempMode == StepTempMode::Target) {
+      // Go to temp target edit
+      _screen = Screen::EditStepTempTarget;
+    } else {
+      _screen = Screen::StepDetailMenu;
+    }
+    changed = true;
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::StepDetailMenu;
+  }
+  
+  return changed;
+}
+
+bool MenuController::handleEditStepTempTarget(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    _editStepTempTarget += s.encDelta * 0.5f;
+    if (_editStepTempTarget < 15.0f) _editStepTempTarget = 15.0f;
+    if (_editStepTempTarget > 40.0f) _editStepTempTarget = 40.0f;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    _session->settings().steps[_editStepIdx].tempTarget = _editStepTempTarget;
+    _screen = Screen::StepDetailMenu;
+    changed = true;
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::StepDetailMenu;
+  }
+  
+  return changed;
+}
+
+bool MenuController::handleEditStepTempBiasMode(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    // Toggle between Off and Bias
+    _editStepTempBiasMode = (_editStepTempBiasMode == StepTempBiasMode::Off) 
+                            ? StepTempBiasMode::Bias : StepTempBiasMode::Off;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    _session->settings().steps[_editStepIdx].tempBiasMode = _editStepTempBiasMode;
+    if (_editStepTempBiasMode == StepTempBiasMode::Bias) {
+      // Go to bias value edit
+      _screen = Screen::EditStepTempBias;
+    } else {
+      _screen = Screen::StepDetailMenu;
+    }
+    changed = true;
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::StepDetailMenu;
+  }
+  
+  return changed;
+}
+
+bool MenuController::handleEditStepTempBias(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    _editStepTempBias += s.encDelta * 0.5f;
+    if (_editStepTempBias < 0.5f) _editStepTempBias = 0.5f;
+    if (_editStepTempBias > 10.0f) _editStepTempBias = 10.0f;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    _session->settings().steps[_editStepIdx].tempBias = _editStepTempBias;
+    _screen = Screen::StepDetailMenu;
+    changed = true;
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::StepDetailMenu;
+  }
+  
+  return changed;
+}
+
+bool MenuController::handleEditStepName(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  // Simple character editing: encoder cycles through characters at cursor
+  if (s.encDelta != 0) {
+    // Character set: A-Z, a-z, 0-9, space, and some symbols
+    static const char charset[] = " ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.";
+    static const int charsetLen = sizeof(charset) - 1;
+    
+    char current = _editStepName[_editNameCursor];
+    int idx = 0;
+    for (int i = 0; i < charsetLen; i++) {
+      if (charset[i] == current) { idx = i; break; }
+    }
+    idx += s.encDelta;
+    if (idx < 0) idx = charsetLen - 1;
+    if (idx >= charsetLen) idx = 0;
+    _editStepName[_editNameCursor] = charset[idx];
+    if (_editNameCursor + 1 < STEP_NAME_LEN) {
+      _editStepName[_editNameCursor + 1] = '\0';
+    }
+  }
+
+  // OK moves cursor right or saves if at end
+  if (s.okPressed) {
+    if (_editNameCursor < STEP_NAME_LEN - 2) {
+      _editNameCursor++;
+      if (_editStepName[_editNameCursor] == '\0') {
+        _editStepName[_editNameCursor] = ' ';
+        _editStepName[_editNameCursor + 1] = '\0';
+      }
+    } else {
+      // Trim trailing spaces and save
+      int len = strlen(_editStepName);
+      while (len > 0 && _editStepName[len - 1] == ' ') len--;
+      _editStepName[len] = '\0';
+      strncpy(_session->settings().steps[_editStepIdx].name, _editStepName, STEP_NAME_LEN);
+      _screen = Screen::StepDetailMenu;
+      changed = true;
+    }
+  }
+  
+  // Encoder switch saves immediately
+  if (s.encSwPressed) {
+    int len = strlen(_editStepName);
+    while (len > 0 && _editStepName[len - 1] == ' ') len--;
+    _editStepName[len] = '\0';
+    strncpy(_session->settings().steps[_editStepIdx].name, _editStepName, STEP_NAME_LEN);
+    _screen = Screen::StepDetailMenu;
+    changed = true;
+  }
+  
+  if (s.backPressed || s.a0BackPressed) {
+    // Move cursor left, or exit if at start
+    if (_editNameCursor > 0) {
+      _editNameCursor--;
+    } else {
+      _screen = Screen::StepDetailMenu;
+    }
+  }
+  
+  return changed;
+}
+
+// ===== Step-level TempCoef Override =====
+bool MenuController::handleEditStepTempCoefOverride(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    _editStepTempCoefOverride = !_editStepTempCoefOverride;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    auto& step = _session->settings().steps[_editStepIdx];
+    step.tempCoefOverride = _editStepTempCoefOverride;
+    if (_editStepTempCoefOverride) {
+      // Go to step-specific temp coef settings
+      _editTempCoefEnabled = step.tempCoefEnabled;
+      _screen = Screen::EditStepTempCoefEnabled;
+    } else {
+      _screen = Screen::StepDetailMenu;
+    }
+    changed = true;
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::StepDetailMenu;
+  }
+  
+  return changed;
+}
+
+bool MenuController::handleEditStepTempCoefEnabled(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    _editTempCoefEnabled = !_editTempCoefEnabled;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    auto& step = _session->settings().steps[_editStepIdx];
+    step.tempCoefEnabled = _editTempCoefEnabled;
+    if (_editTempCoefEnabled) {
+      _editTempCoefBase = step.tempCoefBase;
+      _screen = Screen::EditStepTempCoefBase;
+    } else {
+      _screen = Screen::StepDetailMenu;
+    }
+    changed = true;
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::StepDetailMenu;
+  }
+  
+  return changed;
+}
+
+bool MenuController::handleEditStepTempCoefBase(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    _editTempCoefBase += s.encDelta * 0.5f;
+    if (_editTempCoefBase < 15.0f) _editTempCoefBase = 15.0f;
+    if (_editTempCoefBase > 30.0f) _editTempCoefBase = 30.0f;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    auto& step = _session->settings().steps[_editStepIdx];
+    step.tempCoefBase = _editTempCoefBase;
+    _editTempCoefPercent = step.tempCoefPercent;
+    _screen = Screen::EditStepTempCoefPercent;
+    changed = true;
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::StepDetailMenu;
+  }
+  
+  return changed;
+}
+
+bool MenuController::handleEditStepTempCoefPercent(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    _editTempCoefPercent += s.encDelta;
+    if (_editTempCoefPercent < 1.0f) _editTempCoefPercent = 1.0f;
+    if (_editTempCoefPercent > 50.0f) _editTempCoefPercent = 50.0f;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    auto& step = _session->settings().steps[_editStepIdx];
+    step.tempCoefPercent = _editTempCoefPercent;
+    _editTempCoefTarget = step.tempCoefTarget;
+    _screen = Screen::EditStepTempCoefTarget;
+    changed = true;
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::StepDetailMenu;
+  }
+  
+  return changed;
+}
+
+bool MenuController::handleEditStepTempCoefTarget(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    int8_t v = (int8_t)_editTempCoefTarget + s.encDelta;
+    if (v < 0) v = 2;
+    if (v > 2) v = 0;
+    _editTempCoefTarget = (TempCoefTarget)v;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    auto& step = _session->settings().steps[_editStepIdx];
+    step.tempCoefTarget = _editTempCoefTarget;
+    _editTempAlarmAction = step.tempAlarmAction;
+    _screen = Screen::EditStepTempAlarmAction;
+    changed = true;
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::StepDetailMenu;
+  }
+  
+  return changed;
+}
+
+bool MenuController::handleEditStepTempAlarmAction(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    int8_t v = (int8_t)_editTempAlarmAction + s.encDelta;
+    if (v < 0) v = 3;
+    if (v > 3) v = 0;
+    _editTempAlarmAction = (TempAlarmAction)v;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    _session->settings().steps[_editStepIdx].tempAlarmAction = _editTempAlarmAction;
+    _screen = Screen::StepDetailMenu;
+    changed = true;
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::StepDetailMenu;
   }
   
   return changed;
@@ -332,53 +837,11 @@ bool MenuController::handleEditReverseInterval(const InputsSnapshot& s) {
   return changed;
 }
 
-// ===== TempCoef Submenu =====
+// ===== TempCoef (Profile-level, accessed from ProfileSettingsMenu) =====
+// handleTempCoefMenu is no longer needed - settings accessed from ProfileSettingsMenu
 void MenuController::handleTempCoefMenu(const InputsSnapshot& s) {
-  const int8_t ITEMS = 7;  // Enabled, Base, Percent, Target, LimitsEnabled, Min, Max
-  
-  if (s.encDelta != 0) {
-    _subMenuIdx += s.encDelta;
-    if (_subMenuIdx < 0) _subMenuIdx = ITEMS - 1;
-    if (_subMenuIdx >= ITEMS) _subMenuIdx = 0;
-  }
-
-  if (s.okPressed || s.encSwPressed) {
-    const auto& set = _session->settings();
-    switch (_subMenuIdx) {
-      case 0:
-        _editTempCoefEnabled = set.tempCoefEnabled;
-        _screen = Screen::EditTempCoefEnabled;
-        break;
-      case 1:
-        _editTempCoefBase = set.tempCoefBase;
-        _screen = Screen::EditTempCoefBase;
-        break;
-      case 2:
-        _editTempCoefPercent = set.tempCoefPercent;
-        _screen = Screen::EditTempCoefPercent;
-        break;
-      case 3:
-        _editTempCoefTarget = set.tempCoefTarget;
-        _screen = Screen::EditTempCoefTarget;
-        break;
-      case 4:
-        _editTempLimitsEnabled = set.tempLimitsEnabled;
-        _screen = Screen::EditTempLimitsEnabled;
-        break;
-      case 5:
-        _editTempMin = set.tempMin;
-        _screen = Screen::EditTempMin;
-        break;
-      case 6:
-        _editTempMax = set.tempMax;
-        _screen = Screen::EditTempMax;
-        break;
-    }
-  }
-
-  if (s.backPressed || s.a0BackPressed) {
-    _screen = Screen::Menu;
-  }
+  // Redirect to ProfileSettingsMenu (legacy, should not be called)
+  _screen = Screen::ProfileSettingsMenu;
 }
 
 bool MenuController::handleEditTempCoefEnabled(const InputsSnapshot& s) {
@@ -390,11 +853,11 @@ bool MenuController::handleEditTempCoefEnabled(const InputsSnapshot& s) {
 
   if (s.okPressed || s.encSwPressed) {
     _session->settings().tempCoefEnabled = _editTempCoefEnabled;
-    _screen = Screen::TempCoefMenu;
+    _screen = Screen::ProfileSettingsMenu;
     changed = true;
   }
   if (s.backPressed || s.a0BackPressed) {
-    _screen = Screen::TempCoefMenu;
+    _screen = Screen::ProfileSettingsMenu;
   }
   
   return changed;
@@ -411,11 +874,11 @@ bool MenuController::handleEditTempCoefBase(const InputsSnapshot& s) {
 
   if (s.okPressed || s.encSwPressed) {
     _session->settings().tempCoefBase = _editTempCoefBase;
-    _screen = Screen::TempCoefMenu;
+    _screen = Screen::ProfileSettingsMenu;
     changed = true;
   }
   if (s.backPressed || s.a0BackPressed) {
-    _screen = Screen::TempCoefMenu;
+    _screen = Screen::ProfileSettingsMenu;
   }
   
   return changed;
@@ -432,11 +895,11 @@ bool MenuController::handleEditTempCoefPercent(const InputsSnapshot& s) {
 
   if (s.okPressed || s.encSwPressed) {
     _session->settings().tempCoefPercent = _editTempCoefPercent;
-    _screen = Screen::TempCoefMenu;
+    _screen = Screen::ProfileSettingsMenu;
     changed = true;
   }
   if (s.backPressed || s.a0BackPressed) {
-    _screen = Screen::TempCoefMenu;
+    _screen = Screen::ProfileSettingsMenu;
   }
   
   return changed;
@@ -454,11 +917,33 @@ bool MenuController::handleEditTempCoefTarget(const InputsSnapshot& s) {
 
   if (s.okPressed || s.encSwPressed) {
     _session->settings().tempCoefTarget = _editTempCoefTarget;
-    _screen = Screen::TempCoefMenu;
+    _screen = Screen::ProfileSettingsMenu;
     changed = true;
   }
   if (s.backPressed || s.a0BackPressed) {
-    _screen = Screen::TempCoefMenu;
+    _screen = Screen::ProfileSettingsMenu;
+  }
+  
+  return changed;
+}
+
+bool MenuController::handleEditTempAlarmAction(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    int8_t v = (int8_t)_editTempAlarmAction + s.encDelta;
+    if (v < 0) v = 3;
+    if (v > 3) v = 0;
+    _editTempAlarmAction = (TempAlarmAction)v;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    _session->settings().tempAlarmAction = _editTempAlarmAction;
+    _screen = Screen::ProfileSettingsMenu;
+    changed = true;
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::ProfileSettingsMenu;
   }
   
   return changed;
@@ -474,11 +959,11 @@ bool MenuController::handleEditTempLimitsEnabled(const InputsSnapshot& s) {
 
   if (s.okPressed || s.encSwPressed) {
     _session->settings().tempLimitsEnabled = _editTempLimitsEnabled;
-    _screen = Screen::TempCoefMenu;
+    _screen = Screen::ProfileSettingsMenu;
     changed = true;
   }
   if (s.backPressed || s.a0BackPressed) {
-    _screen = Screen::TempCoefMenu;
+    _screen = Screen::ProfileSettingsMenu;
   }
   
   return changed;
@@ -495,11 +980,11 @@ bool MenuController::handleEditTempMin(const InputsSnapshot& s) {
 
   if (s.okPressed || s.encSwPressed) {
     _session->settings().tempMin = _editTempMin;
-    _screen = Screen::TempCoefMenu;
+    _screen = Screen::ProfileSettingsMenu;
     changed = true;
   }
   if (s.backPressed || s.a0BackPressed) {
-    _screen = Screen::TempCoefMenu;
+    _screen = Screen::ProfileSettingsMenu;
   }
   
   return changed;
@@ -516,11 +1001,11 @@ bool MenuController::handleEditTempMax(const InputsSnapshot& s) {
 
   if (s.okPressed || s.encSwPressed) {
     _session->settings().tempMax = _editTempMax;
-    _screen = Screen::TempCoefMenu;
+    _screen = Screen::ProfileSettingsMenu;
     changed = true;
   }
   if (s.backPressed || s.a0BackPressed) {
-    _screen = Screen::TempCoefMenu;
+    _screen = Screen::ProfileSettingsMenu;
   }
   
   return changed;

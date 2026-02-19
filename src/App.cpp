@@ -86,7 +86,7 @@ void App::updateUiModel(const InputsSnapshot& s) {
   _uiModel.dirFwd = _motor.dirFwd();
   
   // RPM
-  _uiModel.rpm = (scr == Screen::EditRpm) ? _menu.editRpm() : set.targetRpm;
+  _uiModel.rpm = set.targetRpm;
   _uiModel.adjustedRpm = _session.adjustedRpm();
   
   // Reverse
@@ -103,15 +103,61 @@ void App::updateUiModel(const InputsSnapshot& s) {
     _uiModel.stepDurations[i] = set.steps[i].durationSec;
   }
   
+  // Current step info for main screen display
+  int8_t curStep = _session.currentStep();
+  if (curStep >= 0 && curStep < set.stepCount) {
+    strncpy(_uiModel.currentStepName, set.steps[curStep].name, sizeof(_uiModel.currentStepName) - 1);
+    _uiModel.currentStepName[sizeof(_uiModel.currentStepName) - 1] = '\0';
+    _uiModel.currentStepRpm = set.steps[curStep].rpm;
+  } else {
+    _uiModel.currentStepName[0] = '\0';
+    _uiModel.currentStepRpm = set.targetRpm;
+  }
+  
+  // Profile name
+  strncpy(_uiModel.profileName, set.profileName, sizeof(_uiModel.profileName) - 1);
+  _uiModel.profileName[sizeof(_uiModel.profileName) - 1] = '\0';
+  
   // Edit step values
   _uiModel.editStepIdx = _menu.editStepIdx();
+  _uiModel.editStepDetailIdx = _menu.editStepDetailIdx();
   _uiModel.editStepDuration = (scr == Screen::EditStepDuration) ? _menu.editStepDuration() : 0;
+  
+  // Step editing - get values from step being edited
+  int8_t editIdx = _menu.editStepIdx();
+  if (editIdx >= 0 && editIdx < set.stepCount) {
+    const auto& step = set.steps[editIdx];
+    _uiModel.editStepRpm = (scr == Screen::EditStepRpm) ? _menu.editStepRpm() : step.rpm;
+    _uiModel.editStepTempMode = (scr == Screen::EditStepTempMode) ? (uint8_t)_menu.editStepTempMode() : (uint8_t)step.tempMode;
+    _uiModel.editStepTempTarget = (scr == Screen::EditStepTempTarget) ? _menu.editStepTempTarget() : step.tempTarget;
+    _uiModel.editStepTempBiasMode = (scr == Screen::EditStepTempBiasMode) ? (uint8_t)_menu.editStepTempBiasMode() : (uint8_t)step.tempBiasMode;
+    _uiModel.editStepTempBias = (scr == Screen::EditStepTempBias) ? _menu.editStepTempBias() : step.tempBias;
+    if (scr == Screen::EditStepName) {
+      strncpy(_uiModel.editStepName, _menu.editStepName(), sizeof(_uiModel.editStepName) - 1);
+    } else {
+      strncpy(_uiModel.editStepName, step.name, sizeof(_uiModel.editStepName) - 1);
+    }
+    _uiModel.editStepName[sizeof(_uiModel.editStepName) - 1] = '\0';
+  }
 
   // Temperature coefficient
-  _uiModel.tempCoefEnabled = (scr == Screen::EditTempCoefEnabled) ? _menu.editTempCoefEnabled() : set.tempCoefEnabled;
-  _uiModel.tempCoefBase = (scr == Screen::EditTempCoefBase) ? _menu.editTempCoefBase() : set.tempCoefBase;
-  _uiModel.tempCoefPercent = (scr == Screen::EditTempCoefPercent) ? _menu.editTempCoefPercent() : set.tempCoefPercent;
-  _uiModel.tempCoefTarget = (scr == Screen::EditTempCoefTarget) ? _menu.editTempCoefTarget() : set.tempCoefTarget;
+  _uiModel.tempCoefEnabled = (scr == Screen::EditTempCoefEnabled || scr == Screen::EditStepTempCoefEnabled) 
+                             ? _menu.editTempCoefEnabled() : set.tempCoefEnabled;
+  _uiModel.tempCoefBase = (scr == Screen::EditTempCoefBase || scr == Screen::EditStepTempCoefBase) 
+                          ? _menu.editTempCoefBase() : set.tempCoefBase;
+  _uiModel.tempCoefPercent = (scr == Screen::EditTempCoefPercent || scr == Screen::EditStepTempCoefPercent) 
+                             ? _menu.editTempCoefPercent() : set.tempCoefPercent;
+  _uiModel.tempCoefTarget = (scr == Screen::EditTempCoefTarget || scr == Screen::EditStepTempCoefTarget) 
+                            ? _menu.editTempCoefTarget() : set.tempCoefTarget;
+  _uiModel.tempAlarmAction = (scr == Screen::EditTempAlarmAction || scr == Screen::EditStepTempAlarmAction) 
+                             ? (uint8_t)_menu.editTempAlarmAction() : (uint8_t)set.tempAlarmAction;
+  
+  // Step TempCoef override
+  if (editIdx >= 0 && editIdx < set.stepCount) {
+    _uiModel.editStepTempCoefOverride = (scr == Screen::EditStepTempCoefOverride) 
+                                        ? _menu.editStepTempCoefOverride() 
+                                        : set.steps[editIdx].tempCoefOverride;
+  }
 
   // Temperature limits
   _uiModel.tempLimitsEnabled = (scr == Screen::EditTempLimitsEnabled) ? _menu.editTempLimitsEnabled() : set.tempLimitsEnabled;

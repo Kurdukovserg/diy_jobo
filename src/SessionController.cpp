@@ -29,7 +29,42 @@ void SessionController::checkTempLimits() {
   
   _tempLow = _currentTempC < _settings.tempMin;
   _tempHigh = _currentTempC > _settings.tempMax;
+  bool wasAlarm = _tempAlarm;
   _tempAlarm = _tempLow || _tempHigh;
+  
+  // Apply alarm action when alarm starts (not on every tick)
+  if (_tempAlarm && !wasAlarm && _running) {
+    // Get alarm action (step override or profile)
+    TempAlarmAction action = _settings.tempAlarmAction;
+    if (_currentStep >= 0 && _currentStep < _settings.stepCount) {
+      const auto& step = _settings.steps[_currentStep];
+      if (step.tempCoefOverride) {
+        action = step.tempAlarmAction;
+      }
+    }
+    
+    switch (action) {
+      case TempAlarmAction::None:
+        // Just display, no action
+        break;
+      case TempAlarmAction::Beep:
+        // Beep is handled by App.cpp via buzzer alerts
+        break;
+      case TempAlarmAction::Pause:
+        // Pause the process
+        _running = false;
+        _paused = true;
+        _stepPausedMs += millis() - _stepStartMs;
+        _timerActive = false;
+        Serial.println("TempAlarm: PAUSE action triggered");
+        break;
+      case TempAlarmAction::Stop:
+        // Stop the process completely
+        stop();
+        Serial.println("TempAlarm: STOP action triggered");
+        break;
+    }
+  }
 }
 
 void SessionController::start() {
@@ -128,18 +163,52 @@ void SessionController::applyToMotor() {
 }
 
 float SessionController::calcTempCoefMultiplier() const {
-  if (!_settings.tempCoefEnabled || isnan(_currentTempC)) {
-    return 1.0f;
+  return calcTempCoefMultiplierForStep(_currentStep);
+}
+
+float SessionController::calcTempCoefMultiplierForStep(int8_t stepIdx) const {
+  if (isnan(_currentTempC)) return 1.0f;
+  
+  // Check if step has override
+  bool enabled = _settings.tempCoefEnabled;
+  float base = _settings.tempCoefBase;
+  float percent = _settings.tempCoefPercent;
+  
+  if (stepIdx >= 0 && stepIdx < _settings.stepCount) {
+    const auto& step = _settings.steps[stepIdx];
+    if (step.tempCoefOverride) {
+      enabled = step.tempCoefEnabled;
+      base = step.tempCoefBase;
+      percent = step.tempCoefPercent;
+    }
   }
-  float tempDiff = _currentTempC - _settings.tempCoefBase;
-  return 1.0f + (tempDiff * _settings.tempCoefPercent / 100.0f);
+  
+  if (!enabled) return 1.0f;
+  
+  float tempDiff = _currentTempC - base;
+  return 1.0f + (tempDiff * percent / 100.0f);
 }
 
 float SessionController::adjustedRpm() const {
+  // Use current step's RPM if running
   float rpm = (float)_settings.targetRpm;
-  if (_settings.tempCoefEnabled && !isnan(_currentTempC)) {
-    if (_settings.tempCoefTarget == TempCoefTarget::Rpm || 
-        _settings.tempCoefTarget == TempCoefTarget::Both) {
+  if (_currentStep >= 0 && _currentStep < _settings.stepCount && _running) {
+    rpm = (float)_settings.steps[_currentStep].rpm;
+  }
+  
+  // Get temp coef settings (step override or profile)
+  bool enabled = _settings.tempCoefEnabled;
+  TempCoefTarget target = _settings.tempCoefTarget;
+  if (_currentStep >= 0 && _currentStep < _settings.stepCount) {
+    const auto& step = _settings.steps[_currentStep];
+    if (step.tempCoefOverride) {
+      enabled = step.tempCoefEnabled;
+      target = step.tempCoefTarget;
+    }
+  }
+  
+  if (enabled && !isnan(_currentTempC)) {
+    if (target == TempCoefTarget::Rpm || target == TempCoefTarget::Both) {
       rpm *= calcTempCoefMultiplier();
       if (rpm < 1.0f) rpm = 1.0f;
       if (rpm > 80.0f) rpm = 80.0f;
@@ -150,13 +219,21 @@ float SessionController::adjustedRpm() const {
 
 int32_t SessionController::adjustedStepDurationSec(int8_t stepIdx) const {
   if (stepIdx < 0 || stepIdx >= _settings.stepCount) return 0;
-  int32_t dur = _settings.steps[stepIdx].durationSec;
+  const auto& step = _settings.steps[stepIdx];
+  int32_t dur = step.durationSec;
   if (dur == 0) return 0;
   
-  if (_settings.tempCoefEnabled && !isnan(_currentTempC)) {
-    if (_settings.tempCoefTarget == TempCoefTarget::Timer || 
-        _settings.tempCoefTarget == TempCoefTarget::Both) {
-      float mult = calcTempCoefMultiplier();
+  // Get temp coef settings (step override or profile)
+  bool enabled = _settings.tempCoefEnabled;
+  TempCoefTarget target = _settings.tempCoefTarget;
+  if (step.tempCoefOverride) {
+    enabled = step.tempCoefEnabled;
+    target = step.tempCoefTarget;
+  }
+  
+  if (enabled && !isnan(_currentTempC)) {
+    if (target == TempCoefTarget::Timer || target == TempCoefTarget::Both) {
+      float mult = calcTempCoefMultiplierForStep(stepIdx);
       // For timer: higher temp = shorter time (inverse relationship)
       // Standard film dev: each degree above base reduces time
       dur = (int32_t)(dur / mult);
