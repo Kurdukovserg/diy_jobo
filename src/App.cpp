@@ -49,8 +49,9 @@ void App::tick() {
   _session.tick();
   _buzzer.tick();
   
-  // Sync buzzer settings from menu
+  // Sync settings from menu when changed
   if (settingsChanged) {
+    // Buzzer event settings
     BuzzerSettings bs;
     bs.enabled = _menu.editBuzzerEnabled();
     bs.onStepFinished = _menu.editBuzzerStepFinished();
@@ -58,6 +59,13 @@ void App::tick() {
     bs.onTempWarning = _menu.editBuzzerTempWarning();
     bs.freqHz = _menu.editBuzzerFreq();
     _buzzer.setSettings(bs);
+    
+    // Hardware settings
+    const auto& hw = _menu.hwSettings();
+    _motor.setStepsPerRev(hw.stepsPerRev);
+    _motor.setMicrosteps(hw.microsteps);
+    _buzzer.setActiveHigh(hw.buzzerActiveHigh);
+    _temp.setOffset(hw.tempOffset);
   }
   
   checkBuzzerEvents();
@@ -152,23 +160,13 @@ void App::checkBuzzerEvents() {
   bool paused = _session.isPaused();
   bool tempAlarm = _session.isTempAlarm();
   
-  // Debug: print state every second
-  static uint32_t lastDbg = 0;
-  if (millis() - lastDbg > 1000) {
-    lastDbg = millis();
-    Serial.printf("run=%d pause=%d step=%d prevRun=%d prevPause=%d\n", 
-                  running, paused, step, _prevRunning, _prevPaused);
-  }
-  
   // Step completed - entered pause state between steps
   if (paused && !_prevPaused && _prevRunning) {
-    Serial.println("StepFinished (pause)");
     _buzzer.alert(AlertType::StepFinished);
   }
   
   // Session/process completed - was running, now stopped (not paused)
   if (_prevRunning && !running && !paused) {
-    Serial.println("ProcessEnded");
     _buzzer.alert(AlertType::ProcessEnded);
   }
   

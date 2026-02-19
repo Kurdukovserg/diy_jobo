@@ -41,6 +41,9 @@ public:
     _cfg.freqHz = s.freqHz;
   }
   
+  void setActiveHigh(bool high) { _cfg.activeHigh = high; }
+  bool activeHigh() const { return _cfg.activeHigh; }
+  
   BuzzerSettings& settings() { return _settings; }
   const BuzzerSettings& settings() const { return _settings; }
 
@@ -64,7 +67,6 @@ public:
   
   void testBeep() {
     if (_cfg.pin == 255) return;
-    Serial.println("testBeep() called");
     // Immediately start tone for instant feedback
     on();
     _alertType = AlertType::StepFinished;
