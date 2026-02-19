@@ -60,6 +60,53 @@ bool MenuController::handleInput(const InputsSnapshot& s) {
     case Screen::EditTempMax:
       settingsChanged = handleEditTempMax(s);
       break;
+    // Buzzer
+    case Screen::BuzzerMenu:
+      handleBuzzerMenu(s);
+      break;
+    case Screen::EditBuzzerEnabled:
+      settingsChanged = handleEditBuzzerEnabled(s);
+      break;
+    case Screen::EditBuzzerStepFinished:
+      settingsChanged = handleEditBuzzerStepFinished(s);
+      break;
+    case Screen::EditBuzzerProcessEnded:
+      settingsChanged = handleEditBuzzerProcessEnded(s);
+      break;
+    case Screen::EditBuzzerTempWarning:
+      settingsChanged = handleEditBuzzerTempWarning(s);
+      break;
+    case Screen::EditBuzzerFreq:
+      settingsChanged = handleEditBuzzerFreq(s);
+      break;
+    case Screen::BuzzerTest:
+      handleBuzzerTest(s);
+      break;
+    // Hardware
+    case Screen::HardwareMenu:
+      handleHardwareMenu(s);
+      break;
+    case Screen::EditStepsPerRev:
+      settingsChanged = handleEditStepsPerRev(s);
+      break;
+    case Screen::EditMicrosteps:
+      settingsChanged = handleEditMicrosteps(s);
+      break;
+    case Screen::EditDriverType:
+      settingsChanged = handleEditDriverType(s);
+      break;
+    case Screen::EditMotorInvert:
+      settingsChanged = handleEditMotorInvert(s);
+      break;
+    case Screen::EditBuzzerType:
+      settingsChanged = handleEditBuzzerType(s);
+      break;
+    case Screen::EditBuzzerActiveHigh:
+      settingsChanged = handleEditBuzzerActiveHigh(s);
+      break;
+    case Screen::EditTempOffset:
+      settingsChanged = handleEditTempOffset(s);
+      break;
   }
   
   return settingsChanged;
@@ -113,6 +160,14 @@ void MenuController::handleMenuScreen(const InputsSnapshot& s) {
         break;
       case 3: 
         _screen = Screen::TempCoefMenu; 
+        break;
+      case 4:
+        _screen = Screen::BuzzerMenu;
+        _subMenuIdx = 0;
+        break;
+      case 5:
+        _screen = Screen::HardwareMenu;
+        _subMenuIdx = 0;
         break;
     }
   }
@@ -465,6 +520,352 @@ bool MenuController::handleEditTempMax(const InputsSnapshot& s) {
   }
   if (s.backPressed || s.a0BackPressed) {
     _screen = Screen::TempCoefMenu;
+  }
+  
+  return changed;
+}
+
+// ===== Buzzer Submenu =====
+void MenuController::handleBuzzerMenu(const InputsSnapshot& s) {
+  const int8_t ITEMS = 6;  // Enabled, StepFinished, ProcessEnded, TempWarning, Freq, Test
+  
+  if (s.encDelta != 0) {
+    _subMenuIdx += s.encDelta;
+    if (_subMenuIdx < 0) _subMenuIdx = ITEMS - 1;
+    if (_subMenuIdx >= ITEMS) _subMenuIdx = 0;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    switch (_subMenuIdx) {
+      case 0:
+        _screen = Screen::EditBuzzerEnabled;
+        break;
+      case 1:
+        _screen = Screen::EditBuzzerStepFinished;
+        break;
+      case 2:
+        _screen = Screen::EditBuzzerProcessEnded;
+        break;
+      case 3:
+        _screen = Screen::EditBuzzerTempWarning;
+        break;
+      case 4:
+        _screen = Screen::EditBuzzerFreq;
+        break;
+      case 5:
+        _screen = Screen::BuzzerTest;
+        break;
+    }
+  }
+
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::Menu;
+  }
+}
+
+bool MenuController::handleEditBuzzerEnabled(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    _editBuzzerEnabled = !_editBuzzerEnabled;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    _screen = Screen::BuzzerMenu;
+    changed = true;
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::BuzzerMenu;
+  }
+  
+  return changed;
+}
+
+bool MenuController::handleEditBuzzerStepFinished(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    _editBuzzerStepFinished = !_editBuzzerStepFinished;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    _screen = Screen::BuzzerMenu;
+    changed = true;
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::BuzzerMenu;
+  }
+  
+  return changed;
+}
+
+bool MenuController::handleEditBuzzerProcessEnded(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    _editBuzzerProcessEnded = !_editBuzzerProcessEnded;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    _screen = Screen::BuzzerMenu;
+    changed = true;
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::BuzzerMenu;
+  }
+  
+  return changed;
+}
+
+bool MenuController::handleEditBuzzerTempWarning(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    _editBuzzerTempWarning = !_editBuzzerTempWarning;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    _screen = Screen::BuzzerMenu;
+    changed = true;
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::BuzzerMenu;
+  }
+  
+  return changed;
+}
+
+bool MenuController::handleEditBuzzerFreq(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    _editBuzzerFreq += s.encDelta * 100;
+    if (_editBuzzerFreq < 800) _editBuzzerFreq = 800;
+    if (_editBuzzerFreq > 4000) _editBuzzerFreq = 4000;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    _screen = Screen::BuzzerMenu;
+    changed = true;
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::BuzzerMenu;
+  }
+  
+  return changed;
+}
+
+void MenuController::handleBuzzerTest(const InputsSnapshot& s) {
+  if (s.okPressed) Serial.println("okPressed!");
+  if (s.encSwPressed) Serial.println("encSwPressed!");
+  
+  if (s.okPressed || s.encSwPressed) {
+    if (_buzzerTestCb) _buzzerTestCb();
+  }
+  
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::BuzzerMenu;
+  }
+}
+
+// ===== Hardware Submenu =====
+void MenuController::handleHardwareMenu(const InputsSnapshot& s) {
+  const int8_t ITEMS = 7;  // StepsPerRev, Microsteps, Driver, Invert, BuzzerType, ActiveHigh, TempOffset
+  
+  if (s.encDelta != 0) {
+    _subMenuIdx += s.encDelta;
+    if (_subMenuIdx < 0) _subMenuIdx = ITEMS - 1;
+    if (_subMenuIdx >= ITEMS) _subMenuIdx = 0;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    switch (_subMenuIdx) {
+      case 0:
+        _editStepsPerRev = _hwSettings.stepsPerRev;
+        _screen = Screen::EditStepsPerRev;
+        break;
+      case 1:
+        _editMicrosteps = _hwSettings.microsteps;
+        _screen = Screen::EditMicrosteps;
+        break;
+      case 2:
+        _editDriverType = _hwSettings.driverType;
+        _screen = Screen::EditDriverType;
+        break;
+      case 3:
+        _editMotorInvert = _hwSettings.motorInvertDir;
+        _screen = Screen::EditMotorInvert;
+        break;
+      case 4:
+        _editBuzzerType = _hwSettings.buzzerType;
+        _screen = Screen::EditBuzzerType;
+        break;
+      case 5:
+        _editBuzzerActiveHigh = _hwSettings.buzzerActiveHigh;
+        _screen = Screen::EditBuzzerActiveHigh;
+        break;
+      case 6:
+        _editTempOffset = _hwSettings.tempOffset;
+        _screen = Screen::EditTempOffset;
+        break;
+    }
+  }
+
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::Menu;
+  }
+}
+
+bool MenuController::handleEditStepsPerRev(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    // Toggle between common values: 200, 400
+    if (_editStepsPerRev == 200) _editStepsPerRev = 400;
+    else _editStepsPerRev = 200;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    _hwSettings.stepsPerRev = _editStepsPerRev;
+    _screen = Screen::HardwareMenu;
+    changed = true;
+    if (_hwChangedCb) _hwChangedCb();
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::HardwareMenu;
+  }
+  
+  return changed;
+}
+
+bool MenuController::handleEditMicrosteps(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    // Cycle through: 1, 2, 4, 8, 16, 32
+    static const uint8_t vals[] = {1, 2, 4, 8, 16, 32};
+    int8_t idx = 0;
+    for (int8_t i = 0; i < 6; i++) {
+      if (vals[i] == _editMicrosteps) { idx = i; break; }
+    }
+    idx += s.encDelta;
+    if (idx < 0) idx = 5;
+    if (idx > 5) idx = 0;
+    _editMicrosteps = vals[idx];
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    _hwSettings.microsteps = _editMicrosteps;
+    _screen = Screen::HardwareMenu;
+    changed = true;
+    if (_hwChangedCb) _hwChangedCb();
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::HardwareMenu;
+  }
+  
+  return changed;
+}
+
+bool MenuController::handleEditDriverType(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    _editDriverType = (_editDriverType == DriverType::Generic) 
+                      ? DriverType::TMC2209 : DriverType::Generic;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    _hwSettings.driverType = _editDriverType;
+    _screen = Screen::HardwareMenu;
+    changed = true;
+    if (_hwChangedCb) _hwChangedCb();
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::HardwareMenu;
+  }
+  
+  return changed;
+}
+
+bool MenuController::handleEditMotorInvert(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    _editMotorInvert = !_editMotorInvert;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    _hwSettings.motorInvertDir = _editMotorInvert;
+    _screen = Screen::HardwareMenu;
+    changed = true;
+    if (_hwChangedCb) _hwChangedCb();
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::HardwareMenu;
+  }
+  
+  return changed;
+}
+
+bool MenuController::handleEditBuzzerType(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    _editBuzzerType = (_editBuzzerType == BuzzerType::Active) 
+                      ? BuzzerType::Passive : BuzzerType::Active;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    _hwSettings.buzzerType = _editBuzzerType;
+    _screen = Screen::HardwareMenu;
+    changed = true;
+    if (_hwChangedCb) _hwChangedCb();
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::HardwareMenu;
+  }
+  
+  return changed;
+}
+
+bool MenuController::handleEditBuzzerActiveHigh(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    _editBuzzerActiveHigh = !_editBuzzerActiveHigh;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    _hwSettings.buzzerActiveHigh = _editBuzzerActiveHigh;
+    _screen = Screen::HardwareMenu;
+    changed = true;
+    if (_hwChangedCb) _hwChangedCb();
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::HardwareMenu;
+  }
+  
+  return changed;
+}
+
+bool MenuController::handleEditTempOffset(const InputsSnapshot& s) {
+  bool changed = false;
+  
+  if (s.encDelta != 0) {
+    _editTempOffset += s.encDelta * 0.1f;
+    if (_editTempOffset < -5.0f) _editTempOffset = -5.0f;
+    if (_editTempOffset > 5.0f) _editTempOffset = 5.0f;
+  }
+
+  if (s.okPressed || s.encSwPressed) {
+    _hwSettings.tempOffset = _editTempOffset;
+    _screen = Screen::HardwareMenu;
+    changed = true;
+    if (_hwChangedCb) _hwChangedCb();
+  }
+  if (s.backPressed || s.a0BackPressed) {
+    _screen = Screen::HardwareMenu;
   }
   
   return changed;

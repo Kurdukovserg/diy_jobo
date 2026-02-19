@@ -3,7 +3,14 @@
 #include "StepperISR.h"
 #include <Wire.h>
 
+App* App::instance = nullptr;
+
+void App::buzzerTestCallback() {
+  if (instance) instance->_buzzer.testBeep();
+}
+
 void App::begin() {
+  instance = this;
 #if !defined(ESP32)
   Wire.begin(PIN_SDA, PIN_SCL);
 #else
@@ -27,6 +34,7 @@ void App::begin() {
   
   _session.begin(&_motor);
   _menu.begin(&_session);
+  _menu.setBuzzerTestCallback(&App::buzzerTestCallback);
   
   Buzzer::Config bcfg;
   bcfg.pin = PIN_BUZZER;
@@ -35,11 +43,22 @@ void App::begin() {
 
 void App::tick() {
   InputsSnapshot s = _in.tick();
-  _menu.handleInput(s);
+  bool settingsChanged = _menu.handleInput(s);
   _temp.tick();
   _session.setCurrentTemp(_temp.tempC());
   _session.tick();
   _buzzer.tick();
+  
+  // Sync buzzer settings from menu
+  if (settingsChanged) {
+    BuzzerSettings bs;
+    bs.enabled = _menu.editBuzzerEnabled();
+    bs.onStepFinished = _menu.editBuzzerStepFinished();
+    bs.onProcessEnded = _menu.editBuzzerProcessEnded();
+    bs.onTempWarning = _menu.editBuzzerTempWarning();
+    bs.freqHz = _menu.editBuzzerFreq();
+    _buzzer.setSettings(bs);
+  }
   
   checkBuzzerEvents();
   updateUiModel(s);
@@ -94,6 +113,24 @@ void App::updateUiModel(const InputsSnapshot& s) {
   _uiModel.tempLow = _session.isTempLow();
   _uiModel.tempHigh = _session.isTempHigh();
 
+  // Buzzer settings
+  const auto& bset = _buzzer.settings();
+  _uiModel.buzzerEnabled = (scr == Screen::EditBuzzerEnabled) ? _menu.editBuzzerEnabled() : bset.enabled;
+  _uiModel.buzzerStepFinished = (scr == Screen::EditBuzzerStepFinished) ? _menu.editBuzzerStepFinished() : bset.onStepFinished;
+  _uiModel.buzzerProcessEnded = (scr == Screen::EditBuzzerProcessEnded) ? _menu.editBuzzerProcessEnded() : bset.onProcessEnded;
+  _uiModel.buzzerTempWarning = (scr == Screen::EditBuzzerTempWarning) ? _menu.editBuzzerTempWarning() : bset.onTempWarning;
+  _uiModel.buzzerFreq = (scr == Screen::EditBuzzerFreq) ? _menu.editBuzzerFreq() : bset.freqHz;
+
+  // Hardware settings
+  const auto& hw = _menu.hwSettings();
+  _uiModel.stepsPerRev = (scr == Screen::EditStepsPerRev) ? _menu.editStepsPerRev() : hw.stepsPerRev;
+  _uiModel.microsteps = (scr == Screen::EditMicrosteps) ? _menu.editMicrosteps() : hw.microsteps;
+  _uiModel.driverType = (scr == Screen::EditDriverType) ? (uint8_t)_menu.editDriverType() : (uint8_t)hw.driverType;
+  _uiModel.motorInvert = (scr == Screen::EditMotorInvert) ? _menu.editMotorInvert() : hw.motorInvertDir;
+  _uiModel.buzzerType = (scr == Screen::EditBuzzerType) ? (uint8_t)_menu.editBuzzerType() : (uint8_t)hw.buzzerType;
+  _uiModel.buzzerActiveHigh = (scr == Screen::EditBuzzerActiveHigh) ? _menu.editBuzzerActiveHigh() : hw.buzzerActiveHigh;
+  _uiModel.tempOffset = (scr == Screen::EditTempOffset) ? _menu.editTempOffset() : hw.tempOffset;
+
   _uiModel.hasTemp = _temp.hasSensor();
   _uiModel.tempC = _temp.tempC();
 
@@ -115,13 +152,23 @@ void App::checkBuzzerEvents() {
   bool paused = _session.isPaused();
   bool tempAlarm = _session.isTempAlarm();
   
-  // Step completed (entered pause state)
-  if (running && paused && _prevStep != step) {
+  // Debug: print state every second
+  static uint32_t lastDbg = 0;
+  if (millis() - lastDbg > 1000) {
+    lastDbg = millis();
+    Serial.printf("run=%d pause=%d step=%d prevRun=%d prevPause=%d\n", 
+                  running, paused, step, _prevRunning, _prevPaused);
+  }
+  
+  // Step completed - entered pause state between steps
+  if (paused && !_prevPaused && _prevRunning) {
+    Serial.println("StepFinished (pause)");
     _buzzer.alert(AlertType::StepFinished);
   }
   
-  // Session completed (was running, now stopped and finished all steps)
-  if (_prevRunning && !running && step >= _session.settings().stepCount) {
+  // Session/process completed - was running, now stopped (not paused)
+  if (_prevRunning && !running && !paused) {
+    Serial.println("ProcessEnded");
     _buzzer.alert(AlertType::ProcessEnded);
   }
   
@@ -136,5 +183,6 @@ void App::checkBuzzerEvents() {
   
   _prevStep = step;
   _prevRunning = running;
+  _prevPaused = paused;
   _prevTempAlarm = tempAlarm;
 }

@@ -8,6 +8,14 @@ enum class AlertType : uint8_t {
   TempWarning     // Fast intermittent beeping (repeating)
 };
 
+struct BuzzerSettings {
+  bool enabled = true;           // Master enable
+  bool onStepFinished = true;    // Beep when step ends
+  bool onProcessEnded = true;    // Beep when process ends
+  bool onTempWarning = true;     // Beep on temp alarm
+  uint16_t freqHz = 2200;        // Tone frequency (800-4000)
+};
+
 class Buzzer {
 public:
   struct Config {
@@ -28,20 +36,40 @@ public:
     off();
   }
 
+  void setSettings(const BuzzerSettings& s) {
+    _settings = s;
+    _cfg.freqHz = s.freqHz;
+  }
+  
+  BuzzerSettings& settings() { return _settings; }
+  const BuzzerSettings& settings() const { return _settings; }
+
   void alert(AlertType type) {
-    if (_cfg.pin == 255) return;
+    if (_cfg.pin == 255 || !_settings.enabled) return;
+    
+    // Check if this event type is enabled
+    if (type == AlertType::StepFinished && !_settings.onStepFinished) return;
+    if (type == AlertType::ProcessEnded && !_settings.onProcessEnded) return;
+    if (type == AlertType::TempWarning && !_settings.onTempWarning) return;
+    
     _alertType = type;
     _alertStep = 0;
     _nextActionMs = millis();
-    
-    if (type == AlertType::None) {
-      off();
-    }
   }
   
   void stopAlert() {
     _alertType = AlertType::None;
     off();
+  }
+  
+  void testBeep() {
+    if (_cfg.pin == 255) return;
+    Serial.println("testBeep() called");
+    // Immediately start tone for instant feedback
+    on();
+    _alertType = AlertType::StepFinished;
+    _alertStep = 1;  // Already on, next tick will turn off
+    _nextActionMs = millis() + _cfg.shortMs;
   }
 
   void tick() {
@@ -120,6 +148,7 @@ private:
   }
 
   Config _cfg;
+  BuzzerSettings _settings;
   AlertType _alertType = AlertType::None;
   uint8_t _alertStep = 0;
   uint32_t _nextActionMs = 0;

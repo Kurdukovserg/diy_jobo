@@ -13,6 +13,9 @@ class App {
 public:
   void begin();
   void tick();
+  
+  static App* instance;
+  static void buzzerTestCallback();
 
 private:
   Inputs _in;
@@ -28,6 +31,7 @@ private:
   bool _prevTempAlarm = false;
   int8_t _prevStep = -1;
   bool _prevRunning = false;
+  bool _prevPaused = false;
 
   void updateUiModel(const InputsSnapshot& s);
   void checkBuzzerEvents();

@@ -38,6 +38,23 @@ void Ui::draw(const UiModel& m) {
     case Screen::EditTempLimitsEnabled: drawEditTempLimitsEnabled(m); break;
     case Screen::EditTempMin: drawEditTempMin(m); break;
     case Screen::EditTempMax: drawEditTempMax(m); break;
+    // Buzzer
+    case Screen::BuzzerMenu: drawBuzzerMenu(m); break;
+    case Screen::EditBuzzerEnabled: drawEditBuzzerEnabled(m); break;
+    case Screen::EditBuzzerStepFinished: drawEditBuzzerStepFinished(m); break;
+    case Screen::EditBuzzerProcessEnded: drawEditBuzzerProcessEnded(m); break;
+    case Screen::EditBuzzerTempWarning: drawEditBuzzerTempWarning(m); break;
+    case Screen::EditBuzzerFreq: drawEditBuzzerFreq(m); break;
+    case Screen::BuzzerTest: drawBuzzerTest(m); break;
+    // Hardware
+    case Screen::HardwareMenu: drawHardwareMenu(m); break;
+    case Screen::EditStepsPerRev: drawEditStepsPerRev(m); break;
+    case Screen::EditMicrosteps: drawEditMicrosteps(m); break;
+    case Screen::EditDriverType: drawEditDriverType(m); break;
+    case Screen::EditMotorInvert: drawEditMotorInvert(m); break;
+    case Screen::EditBuzzerType: drawEditBuzzerType(m); break;
+    case Screen::EditBuzzerActiveHigh: drawEditBuzzerActiveHigh(m); break;
+    case Screen::EditTempOffset: drawEditTempOffset(m); break;
   }
 
   _u8g2.sendBuffer();
@@ -111,35 +128,40 @@ void Ui::drawMain(const UiModel& m) {
 
 void Ui::drawMenu(const UiModel& m) {
   const int x = 2;
-  const int TOTAL = 4;  // RPM, Steps>, Reverse>, TempCoef>
+  const int8_t TOTAL = 6;  // RPM, Steps, Reverse, TempCoef, Buzzer, Hardware
   
   _u8g2.setFont(u8g2_font_6x13_tf);
   _u8g2.drawStr(x, 12, "SETTINGS");
   _u8g2.drawHLine(x, 14, 124);
 
-  const char* items[] = {"RPM", "Steps", "Reverse", "TempCoef"};
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  const char* items[] = {"RPM", "Steps", "Reverse", "TempCoef", "Buzzer", "Hardware"};
   char buf[32];
   
-  for (int i = 0; i < TOTAL; i++) {
-    int y = 26 + i * 10;
-    bool sel = (i == m.menuIdx);
+  int8_t startY = 26;
+  int8_t lineH = 10;
+  int8_t visible = 4;
+  int8_t scroll = 0;
+  if (m.menuIdx >= visible) scroll = m.menuIdx - visible + 1;
+  
+  for (int8_t i = 0; i < visible && (scroll + i) < TOTAL; i++) {
+    int8_t idx = scroll + i;
+    int y = startY + i * lineH;
     
-    if (sel) {
-      _u8g2.drawBox(0, y - 8, 128, 10);
+    if (idx == m.menuIdx) {
+      _u8g2.drawBox(0, y - 8, 128, lineH);
       _u8g2.setDrawColor(0);
     }
     
-    switch (i) {
-      case 0: snprintf(buf, sizeof(buf), "%s: %ld", items[i], (long)m.rpm); break;
-      case 1: snprintf(buf, sizeof(buf), "%s (%d) >", items[i], m.stepCount); break;
-      case 2: snprintf(buf, sizeof(buf), "%s >", items[i]); break;
-      case 3: snprintf(buf, sizeof(buf), "%s >", items[i]); break;
+    switch (idx) {
+      case 0: snprintf(buf, sizeof(buf), "%s: %ld", items[idx], (long)m.rpm); break;
+      case 1: snprintf(buf, sizeof(buf), "%s (%d) >", items[idx], m.stepCount); break;
+      default: snprintf(buf, sizeof(buf), "%s >", items[idx]); break;
     }
     _u8g2.drawStr(x, y, buf);
     _u8g2.setDrawColor(1);
   }
 
-  _u8g2.setFont(u8g2_font_5x8_tf);
   _u8g2.drawStr(x, 63, "ENC:sel  OK:edit  BACK:exit");
 }
 
@@ -447,4 +469,268 @@ void Ui::drawEditTempMax(const UiModel& m) {
 
   _u8g2.setFont(u8g2_font_5x8_tf);
   _u8g2.drawStr(x, 63, "ENC:+/-0.5  OK:save  BACK:cancel");
+}
+
+// ===== Buzzer Menu =====
+void Ui::drawBuzzerMenu(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  _u8g2.drawStr(x, 12, "BUZZER");
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  const char* items[] = {
+    "Enabled", "Step done", "Process end", "Temp warn", "Frequency", "Test"
+  };
+  const int8_t itemCount = 6;
+  
+  int8_t startY = 26;
+  int8_t lineH = 10;
+  int8_t visible = 4;
+  int8_t scroll = 0;
+  if (m.subMenuIdx >= visible) scroll = m.subMenuIdx - visible + 1;
+  
+  for (int8_t i = 0; i < visible && (scroll + i) < itemCount; i++) {
+    int8_t idx = scroll + i;
+    int y = startY + i * lineH;
+    if (idx == m.subMenuIdx) {
+      _u8g2.drawBox(0, y - 8, 128, lineH);
+      _u8g2.setDrawColor(0);
+    }
+    _u8g2.drawStr(x, y, items[idx]);
+    _u8g2.setDrawColor(1);
+  }
+
+  _u8g2.drawStr(x, 63, "OK:select  BACK:exit");
+}
+
+void Ui::drawEditBuzzerEnabled(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  _u8g2.drawStr(x, 12, "BUZZER ENABLED");
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_fur30_tf);
+  const char* val = m.buzzerEnabled ? "ON" : "OFF";
+  int w = _u8g2.getStrWidth(val);
+  _u8g2.drawStr((128 - w) / 2, 48, val);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  _u8g2.drawStr(x, 63, "ENC:toggle  OK:save  BACK:cancel");
+}
+
+void Ui::drawEditBuzzerStepFinished(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  _u8g2.drawStr(x, 12, "STEP DONE BEEP");
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_fur30_tf);
+  const char* val = m.buzzerStepFinished ? "ON" : "OFF";
+  int w = _u8g2.getStrWidth(val);
+  _u8g2.drawStr((128 - w) / 2, 48, val);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  _u8g2.drawStr(x, 63, "ENC:toggle  OK:save  BACK:cancel");
+}
+
+void Ui::drawEditBuzzerProcessEnded(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  _u8g2.drawStr(x, 12, "PROCESS END BEEP");
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_fur30_tf);
+  const char* val = m.buzzerProcessEnded ? "ON" : "OFF";
+  int w = _u8g2.getStrWidth(val);
+  _u8g2.drawStr((128 - w) / 2, 48, val);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  _u8g2.drawStr(x, 63, "ENC:toggle  OK:save  BACK:cancel");
+}
+
+void Ui::drawEditBuzzerTempWarning(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  _u8g2.drawStr(x, 12, "TEMP WARNING BEEP");
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_fur30_tf);
+  const char* val = m.buzzerTempWarning ? "ON" : "OFF";
+  int w = _u8g2.getStrWidth(val);
+  _u8g2.drawStr((128 - w) / 2, 48, val);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  _u8g2.drawStr(x, 63, "ENC:toggle  OK:save  BACK:cancel");
+}
+
+void Ui::drawEditBuzzerFreq(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  _u8g2.drawStr(x, 12, "BUZZER FREQUENCY");
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_fur30_tf);
+  char buf[16];
+  snprintf(buf, sizeof(buf), "%d", m.buzzerFreq);
+  int w = _u8g2.getStrWidth(buf);
+  _u8g2.drawStr((128 - w) / 2, 48, buf);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  _u8g2.drawStr(x, 63, "ENC:+/-100  OK:save  BACK:cancel");
+}
+
+void Ui::drawBuzzerTest(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  _u8g2.drawStr(x, 12, "BUZZER TEST");
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_10x20_tf);
+  _u8g2.drawStr(x, 40, "Press OK to beep");
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  _u8g2.drawStr(x, 63, "OK:test  BACK:exit");
+}
+
+// ===== Hardware Menu =====
+void Ui::drawHardwareMenu(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  _u8g2.drawStr(x, 12, "HARDWARE");
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  const char* items[] = {
+    "Steps/rev", "Microsteps", "Driver", "Invert dir", 
+    "Buzzer type", "Buzz active", "Temp offset"
+  };
+  const int8_t itemCount = 7;
+  
+  int8_t startY = 26;
+  int8_t lineH = 10;
+  int8_t visible = 4;
+  int8_t scroll = 0;
+  if (m.subMenuIdx >= visible) scroll = m.subMenuIdx - visible + 1;
+  
+  for (int8_t i = 0; i < visible && (scroll + i) < itemCount; i++) {
+    int8_t idx = scroll + i;
+    int y = startY + i * lineH;
+    if (idx == m.subMenuIdx) {
+      _u8g2.drawBox(0, y - 8, 128, lineH);
+      _u8g2.setDrawColor(0);
+    }
+    _u8g2.drawStr(x, y, items[idx]);
+    _u8g2.setDrawColor(1);
+  }
+
+  _u8g2.drawStr(x, 63, "OK:select  BACK:exit");
+}
+
+void Ui::drawEditStepsPerRev(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  _u8g2.drawStr(x, 12, "STEPS PER REV");
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_fur30_tf);
+  char buf[16];
+  snprintf(buf, sizeof(buf), "%d", m.stepsPerRev);
+  int w = _u8g2.getStrWidth(buf);
+  _u8g2.drawStr((128 - w) / 2, 48, buf);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  _u8g2.drawStr(x, 63, "ENC:200/400  OK:save  BACK:cancel");
+}
+
+void Ui::drawEditMicrosteps(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  _u8g2.drawStr(x, 12, "MICROSTEPS");
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_fur30_tf);
+  char buf[16];
+  snprintf(buf, sizeof(buf), "%d", m.microsteps);
+  int w = _u8g2.getStrWidth(buf);
+  _u8g2.drawStr((128 - w) / 2, 48, buf);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  _u8g2.drawStr(x, 63, "ENC:cycle  OK:save  BACK:cancel");
+}
+
+void Ui::drawEditDriverType(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  _u8g2.drawStr(x, 12, "DRIVER TYPE");
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_fur30_tf);
+  const char* val = (m.driverType == 0) ? "A4988" : "TMC";
+  int w = _u8g2.getStrWidth(val);
+  _u8g2.drawStr((128 - w) / 2, 48, val);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  _u8g2.drawStr(x, 63, "ENC:toggle  OK:save  BACK:cancel");
+}
+
+void Ui::drawEditMotorInvert(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  _u8g2.drawStr(x, 12, "INVERT DIRECTION");
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_fur30_tf);
+  const char* val = m.motorInvert ? "YES" : "NO";
+  int w = _u8g2.getStrWidth(val);
+  _u8g2.drawStr((128 - w) / 2, 48, val);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  _u8g2.drawStr(x, 63, "ENC:toggle  OK:save  BACK:cancel");
+}
+
+void Ui::drawEditBuzzerType(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  _u8g2.drawStr(x, 12, "BUZZER TYPE");
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_fur30_tf);
+  const char* val = (m.buzzerType == 0) ? "Active" : "Passive";
+  int w = _u8g2.getStrWidth(val);
+  _u8g2.drawStr((128 - w) / 2, 48, val);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  _u8g2.drawStr(x, 63, "ENC:toggle  OK:save  BACK:cancel");
+}
+
+void Ui::drawEditBuzzerActiveHigh(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  _u8g2.drawStr(x, 12, "BUZZER ACTIVE");
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_fur30_tf);
+  const char* val = m.buzzerActiveHigh ? "HIGH" : "LOW";
+  int w = _u8g2.getStrWidth(val);
+  _u8g2.drawStr((128 - w) / 2, 48, val);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  _u8g2.drawStr(x, 63, "ENC:toggle  OK:save  BACK:cancel");
+}
+
+void Ui::drawEditTempOffset(const UiModel& m) {
+  const int x = 2;
+  _u8g2.setFont(u8g2_font_6x13_tf);
+  _u8g2.drawStr(x, 12, "TEMP CALIBRATION");
+  _u8g2.drawHLine(x, 14, 124);
+
+  _u8g2.setFont(u8g2_font_fur30_tf);
+  char buf[16];
+  snprintf(buf, sizeof(buf), "%+.1f", m.tempOffset);
+  int w = _u8g2.getStrWidth(buf);
+  _u8g2.drawStr((128 - w) / 2, 48, buf);
+
+  _u8g2.setFont(u8g2_font_5x8_tf);
+  _u8g2.drawStr(x, 63, "ENC:+/-0.1  OK:save  BACK:cancel");
 }
