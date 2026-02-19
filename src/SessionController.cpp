@@ -33,12 +33,14 @@ void SessionController::checkTempLimits() {
 }
 
 void SessionController::start() {
+  Serial.printf("start(): paused=%d\n", _paused);
   if (_paused) {
     // Resume from pause between steps
     _paused = false;
     _running = true;
     _timerActive = true;
     _stepStartMs = millis();
+    Serial.println("  -> resumed from pause");
   } else {
     // Fresh start
     _running = true;
@@ -49,16 +51,19 @@ void SessionController::start() {
       _stepStartMs = millis();
       _stepPausedMs = 0;
     }
+    Serial.printf("  -> fresh start, stepDur=%d\n", stepDur);
   }
 }
 
 void SessionController::stop() {
+  Serial.println("stop() called");
   _running = false;
   _paused = false;
   resetTimer();
 }
 
 void SessionController::toggleRun() {
+  Serial.printf("toggleRun: run=%d pause=%d step=%d\n", _running, _paused, _currentStep);
   if (_running) {
     // Pause current step
     if (_timerActive) {
@@ -66,8 +71,10 @@ void SessionController::toggleRun() {
       _timerActive = false;
     }
     _running = false;
+    Serial.println("  -> paused mid-step");
   } else if (_paused) {
     // Resume after step-end pause (go to next step)
+    Serial.println("  -> calling nextStep");
     nextStep();
   } else {
     // Start/resume
@@ -77,22 +84,25 @@ void SessionController::toggleRun() {
       _timerActive = true;
       _stepStartMs = millis();
     }
+    Serial.printf("  -> started, stepDur=%d\n", stepDur);
   }
 }
 
 void SessionController::nextStep() {
+  Serial.printf("nextStep: cur=%d stepCount=%d\n", _currentStep, _settings.stepCount);
   if (_currentStep + 1 < _settings.stepCount) {
     _currentStep++;
     _paused = false;
     _running = true;
     _stepPausedMs = 0;
     int32_t stepDur = _settings.steps[_currentStep].durationSec;
+    Serial.printf("  -> step %d dur=%d\n", _currentStep, stepDur);
     if (stepDur > 0) {
       _timerActive = true;
       _stepStartMs = millis();
     }
   } else {
-    // All steps complete
+    Serial.println("  -> all done, stop()");
     stop();
   }
 }
@@ -100,9 +110,19 @@ void SessionController::nextStep() {
 void SessionController::applyToMotor() {
   if (!_motor) return;
   
-  // Motor runs when running and not paused between steps
-  _motor->setRun(_running && !_paused);
-  _motor->setTargetRpm(adjustedRpm());
+  bool shouldRun = _running && !_paused;
+  float rpm = adjustedRpm();
+  
+  // Debug only on state change
+  static bool lastShouldRun = false;
+  if (shouldRun != lastShouldRun) {
+    Serial.printf("applyToMotor: run=%d pause=%d -> motor=%d rpm=%.1f\n", 
+                  _running, _paused, shouldRun, rpm);
+    lastShouldRun = shouldRun;
+  }
+  
+  _motor->setRun(shouldRun);
+  _motor->setTargetRpm(rpm);
   _motor->setReverseEnabled(_settings.reverseEnabled);
   _motor->setReverseEverySec(_settings.reverseIntervalSec);
 }
@@ -182,20 +202,24 @@ void SessionController::updateTimer() {
   if (!_timerActive) {
     _timerActive = true;
     _stepStartMs = millis();
+    Serial.printf("updateTimer: started timer for step %d, dur=%d\n", _currentStep, stepDur);
   }
   
   uint32_t elapsedMs = millis() - _stepStartMs + _stepPausedMs;
   if ((int32_t)(elapsedMs / 1000) >= stepDur) {
     // Step complete
+    Serial.printf("updateTimer: step %d complete, elapsed=%lu\n", _currentStep, elapsedMs);
     _timerActive = false;
     _stepPausedMs = 0;
     
     if (_currentStep + 1 < _settings.stepCount) {
       // More steps - pause and wait for user
+      Serial.println("  -> pausing for next step");
       _running = false;
       _paused = true;
     } else {
       // All done
+      Serial.println("  -> all steps done");
       stop();
     }
   }

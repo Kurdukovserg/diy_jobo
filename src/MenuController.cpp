@@ -123,6 +123,7 @@ void MenuController::handleMainScreen(const InputsSnapshot& s) {
   }
 
   if (s.okPressed) {
+    Serial.printf("OK pressed, screen=Main, paused=%d\n", _session->isPaused());
     _session->toggleRun();
   }
 
@@ -656,9 +657,6 @@ bool MenuController::handleEditBuzzerFreq(const InputsSnapshot& s) {
 }
 
 void MenuController::handleBuzzerTest(const InputsSnapshot& s) {
-  if (s.okPressed) Serial.println("okPressed!");
-  if (s.encSwPressed) Serial.println("encSwPressed!");
-  
   if (s.okPressed || s.encSwPressed) {
     if (_buzzerTestCb) _buzzerTestCb();
   }

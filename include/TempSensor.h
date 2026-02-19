@@ -10,7 +10,11 @@ public:
 
   bool ok() const { return _hasSensor && !isnan(_tempC); }
   bool hasSensor() const { return _hasSensor; }
-  float tempC() const { return _tempC; }
+  float tempC() const { return _tempC + _offset; }
+  float rawTempC() const { return _tempC; }
+  
+  void setOffset(float offset) { _offset = offset; }
+  float offset() const { return _offset; }
 
 private:
   OneWire* _ow = nullptr;
@@ -20,6 +24,7 @@ private:
   bool _hasSensor = false;
 
   float _tempC = NAN;
+  float _offset = 0.0f;
 
   enum Phase { IDLE, WAIT };
   Phase _phase = IDLE;

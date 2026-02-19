@@ -18,6 +18,12 @@ public:
   void setTargetRpm(float rpm);     // 0..clamped
   void setReverseEnabled(bool en);
   void setReverseEverySec(float sec);
+  
+  // Hardware config
+  void setStepsPerRev(int steps) { _cfg.stepsPerRev = steps; }
+  void setMicrosteps(int ms) { _cfg.microsteps = ms; }
+  int stepsPerRev() const { return _cfg.stepsPerRev; }
+  int microsteps() const { return _cfg.microsteps; }
 
   void tick(); // call often
 

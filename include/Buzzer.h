@@ -41,6 +41,9 @@ public:
     _cfg.freqHz = s.freqHz;
   }
   
+  void setActiveHigh(bool high) { _cfg.activeHigh = high; }
+  bool activeHigh() const { return _cfg.activeHigh; }
+  
   BuzzerSettings& settings() { return _settings; }
   const BuzzerSettings& settings() const { return _settings; }
 
@@ -64,7 +67,6 @@ public:
   
   void testBeep() {
     if (_cfg.pin == 255) return;
-    Serial.println("testBeep() called");
     // Immediately start tone for instant feedback
     on();
     _alertType = AlertType::StepFinished;
@@ -73,6 +75,18 @@ public:
   }
 
   void tick() {
+    // Handle software PWM for passive buzzer on ESP8266
+#if !defined(ESP32)
+    if (_toneOn) {
+      uint32_t now = micros();
+      if ((int32_t)(now - _nextToggleUs) >= 0) {
+        _pinHigh = !_pinHigh;
+        digitalWrite(_cfg.pin, _pinHigh ? HIGH : LOW);
+        _nextToggleUs = now + _halfPeriodUs;
+      }
+    }
+#endif
+
     if (_alertType == AlertType::None) return;
     
     uint32_t now = millis();
@@ -134,7 +148,12 @@ private:
 #if defined(ESP32)
     digitalWrite(_cfg.pin, _cfg.activeHigh ? HIGH : LOW);
 #else
-    tone(_cfg.pin, _cfg.freqHz);
+    // Software PWM for ESP8266 - avoids Timer1 conflict with StepperISR
+    _halfPeriodUs = 500000UL / _cfg.freqHz;  // half period in microseconds
+    _nextToggleUs = micros();
+    _pinHigh = true;
+    _toneOn = true;
+    digitalWrite(_cfg.pin, HIGH);
 #endif
   }
 
@@ -142,7 +161,7 @@ private:
 #if defined(ESP32)
     digitalWrite(_cfg.pin, _cfg.activeHigh ? LOW : HIGH);
 #else
-    noTone(_cfg.pin);
+    _toneOn = false;
     digitalWrite(_cfg.pin, _cfg.activeHigh ? LOW : HIGH);
 #endif
   }
@@ -152,4 +171,12 @@ private:
   AlertType _alertType = AlertType::None;
   uint8_t _alertStep = 0;
   uint32_t _nextActionMs = 0;
+  
+  // Software PWM state for ESP8266
+#if !defined(ESP32)
+  bool _toneOn = false;
+  bool _pinHigh = false;
+  uint32_t _halfPeriodUs = 227;  // ~2200Hz default
+  uint32_t _nextToggleUs = 0;
+#endif
 };
